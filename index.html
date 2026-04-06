@@ -564,6 +564,9 @@ body{background-image:radial-gradient(ellipse at 15% 20%,rgba(130,60,255,.07) 0%
 .follow-req-btn.accept{background:rgba(107,203,119,.12);border:1px solid rgba(107,203,119,.3);color:#6bcb77}
 .follow-req-btn.decline{background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.2);color:#ff6b6b}
 .follow-notif{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:rgba(10,8,28,.95);border:1px solid rgba(199,125,255,.3);border-radius:50px;padding:.55rem 1.4rem;font-family:'Cormorant Garamond',serif;font-size:.9rem;color:#c77dff;z-index:9999;transition:opacity .4s;pointer-events:none}
+.active-type{border-color:rgba(199,125,255,.5)!important;background:rgba(199,125,255,.12)!important;color:#c77dff!important}
+.jjb-ctx-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:var(--text);cursor:pointer;font-size:.8rem;padding:.18rem .5rem;min-width:26px;transition:all .15s;font-family:inherit}
+.jjb-ctx-btn:hover{background:rgba(199,125,255,.15);border-color:rgba(199,125,255,.35);color:#c77dff}
 .jjb-wrap{margin:.5rem 0}
 .jjb-board{position:relative;width:100%;min-height:460px;background:#0a0818;border-radius:16px;border:1px solid var(--border);overflow:hidden;cursor:default;margin-bottom:.5rem}
 .jjb-empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;gap:.3rem;opacity:.35}
@@ -937,7 +940,7 @@ console.log('Supabase connected ✦');
   <!-- Top bar -->
   <div class="top-bar">
     <div class="top-bar-left">
-      <div class="u-avatar" id="uAvatar" onclick="showProfileModal()" style="cursor:pointer"></div>
+      <div class="u-avatar" id="uAvatar" onclick="showProfileModal()" style="cursor:pointer;position:relative" title="View profile"></div>
       <div>
         <div id="uNick" style="font-size:.84rem;line-height:1.2;color:var(--text)"></div>
         <div id="activePersonaTag" style="font-size:.72rem;color:var(--accent);cursor:pointer;letter-spacing:.04em" onclick="showPersonaSwitcher()"></div>
@@ -945,7 +948,6 @@ console.log('Supabase connected ✦');
     </div>
     <div class="top-bar-right">
       <button class="top-btn" onclick="showPersonaSwitcher()" id="personaSwitchBtn" style="letter-spacing:.05em">🌙</button>
-      <button class="top-btn" onclick="showProfileModal()">&#9675; My Profile</button>
       <button class="top-btn top-btn-events" onclick="showTab('events')">&#9670; Events</button>
       <button class="top-btn-icon" onclick="showTab('admin')" title="Admin">&#8853;</button>
       <button class="top-btn-icon" onclick="doLogout()" title="Sign out">&#8594;</button>
@@ -1117,6 +1119,15 @@ console.log('Supabase connected ✦');
     <div class="j-entry-form">
       <p class="j-form-title">New Entry</p>
 
+      <!-- Active journal indicator -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
+        <div>
+          <span id="activeJournalName" style="font-family:'Cinzel Decorative',serif;font-size:.82rem;color:var(--accent);letter-spacing:.08em">My Journal</span>
+          <span id="activeJournalHint" style="font-size:.68rem;color:var(--muted);margin-left:.5rem;font-style:italic">personal journal</span>
+        </div>
+        <button onclick="showJournalSwitcher()" style="background:none;border:1px solid var(--border);border-radius:50px;color:var(--muted);cursor:pointer;font-size:.72rem;font-family:'Cormorant Garamond',serif;padding:.22rem .7rem;letter-spacing:.05em;transition:all .2s" onmouseover="this.style.borderColor='rgba(199,125,255,.4)'" onmouseout="this.style.borderColor='var(--border)'">switch</button>
+      </div>
+
       <!-- Text + mic -->
       <div style="position:relative;margin-bottom:.5rem">
         <textarea class="j-textarea" id="jText" placeholder="What's stirring in your creative soul today..."></textarea>
@@ -1126,53 +1137,84 @@ console.log('Supabase connected ✦');
 
       <!-- Board -->
       <div class="jjb-wrap">
-
-        <!-- Board area first -->
+        <!-- Board -->
         <div class="jjb-board" id="junkBoard">
           <canvas id="jjbCanvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;border-radius:14px;z-index:2;background:transparent"></canvas>
           <div class="jjb-empty" id="jjbEmpty">
-            <div style="font-size:1.8rem;margin-bottom:.5rem;opacity:.4">✦</div>
-            <span style="font-size:.82rem;color:var(--muted);letter-spacing:.06em">Your creative space — add anything</span>
+            <div style="font-size:1.6rem;opacity:.25;margin-bottom:.4rem">✦</div>
+            <span style="font-size:.78rem;color:var(--muted);letter-spacing:.06em">Your creative space</span>
           </div>
         </div>
 
-        <!-- Floating toolbar below board -->
+        <!-- Context bar — appears on element select -->
+        <div id="jjbCtxBar" style="display:none;align-items:center;gap:.3rem;padding:.4rem .6rem;background:rgba(10,8,28,.96);border:1px solid rgba(199,125,255,.2);border-radius:10px;margin:.35rem 0;flex-wrap:wrap">
+          <span id="jjbCtxType" style="font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);flex-shrink:0">Selected</span>
+          <div style="width:1px;height:14px;background:rgba(255,255,255,.1);flex-shrink:0"></div>
+          <button class="jjb-ctx-btn" onclick="jjbCtxBack()" title="Send back">↓</button>
+          <button class="jjb-ctx-btn" onclick="jjbCtxForward()" title="Bring forward">↑</button>
+          <!-- Text options -->
+          <div id="jjbCtxText" style="display:none;align-items:center;gap:.25rem">
+            <div style="width:1px;height:14px;background:rgba(255,255,255,.1);flex-shrink:0"></div>
+            <button class="jjb-ctx-btn" onclick="jjbCtxTextSize(-2)">A−</button>
+            <button class="jjb-ctx-btn" onclick="jjbCtxTextSize(2)">A+</button>
+            <button class="jjb-ctx-btn" onclick="jjbCtxEditText()">✎ Edit</button>
+            <input type="color" value="#ffffff" title="Text color" style="width:22px;height:22px;border:none;border-radius:50%;cursor:pointer;padding:0;background:none;flex-shrink:0" onchange="jjbCtxTextColor(this.value)">
+          </div>
+          <!-- Image options -->
+          <div id="jjbCtxImg" style="display:none;align-items:center;gap:.25rem">
+            <div style="width:1px;height:14px;background:rgba(255,255,255,.1);flex-shrink:0"></div>
+            <button class="jjb-ctx-btn" onclick="jjbCtxRotate(-15)">↺</button>
+            <button class="jjb-ctx-btn" onclick="jjbCtxRotate(15)">↻</button>
+          </div>
+          <div style="margin-left:auto;display:flex;gap:.25rem">
+            <button class="jjb-ctx-btn" onclick="jjbCtxDuplicate()" title="Duplicate">⧉</button>
+            <button class="jjb-ctx-btn" style="color:#ff6b6b;border-color:rgba(255,107,107,.2)" onclick="jjbCtxDelete()" title="Delete">✕</button>
+          </div>
+        </div>
+
+        <!-- Main toolbar -->
         <div class="jjb-toolbar-float">
-          <!-- Add buttons row -->
           <div class="jjbt-row">
-            <button type="button" class="jjbt-btn" onclick="document.getElementById('jImgInput').click()" title="Upload image">
+            <button type="button" class="jjbt-btn" onclick="document.getElementById('jImgInput').click()">
               <span class="jjbt-icon">🖼</span><span class="jjbt-lbl">Photo</span>
             </button>
-            <input type="file" id="jImgInput" accept="image/*,image/gif" multiple style="display:none" onchange="jjbAddImage(this)">
-            <button type="button" class="jjbt-btn" onclick="jjbAddUrl()" title="Image from URL">
+            <input type="file" id="jImgInput" accept="image/*" multiple style="display:none" onchange="jjbAddImage(this)">
+            <button type="button" class="jjbt-btn" onclick="jjbAddUrl()">
               <span class="jjbt-icon">🔗</span><span class="jjbt-lbl">URL</span>
             </button>
-            <button type="button" class="jjbt-btn" onclick="jjbAddGif()" title="Add GIF">
+            <button type="button" class="jjbt-btn" onclick="jjbAddGif()">
               <span class="jjbt-icon">✨</span><span class="jjbt-lbl">GIF</span>
             </button>
-            <button type="button" class="jjbt-btn" onclick="jjbAddMusic()" title="Add music">
+            <button type="button" class="jjbt-btn" onclick="jjbAddMusic()">
               <span class="jjbt-icon">🎵</span><span class="jjbt-lbl">Music</span>
             </button>
-            <button type="button" class="jjbt-btn" onclick="jjbAddSticker()" title="Add sticker">
+            <button type="button" class="jjbt-btn" onclick="jjbAddSticker()">
               <span class="jjbt-icon">🌸</span><span class="jjbt-lbl">Sticker</span>
             </button>
-            <button type="button" class="jjbt-btn" onclick="jjbAddText()" title="Add text">
+            <button type="button" class="jjbt-btn" onclick="jjbAddText()">
               <span class="jjbt-icon">✎</span><span class="jjbt-lbl">Text</span>
             </button>
             <div class="jjbt-divider"></div>
-            <button type="button" class="jjbt-btn jjbt-draw" id="jjbDrawBtn" onclick="jjbToggleDraw()" title="Draw mode">
-              <span class="jjbt-icon">✏️</span><span class="jjbt-lbl">Draw</span>
+            <button type="button" class="jjbt-btn jjbt-draw" id="jjbDrawBtn" onclick="jjbToggleDraw()">
+              <span class="jjbt-icon">🖊</span><span class="jjbt-lbl">Draw</span>
+            </button>
+            <button type="button" class="jjbt-btn" id="jjbUndoBtn" onclick="jjbUndo()" style="opacity:.4">
+              <span class="jjbt-icon" style="font-size:.95rem">↩</span><span class="jjbt-lbl">Undo</span>
+            </button>
+            <button type="button" class="jjbt-btn" onclick="inviteToBoard()" style="border-color:rgba(77,150,255,.25);background:rgba(77,150,255,.06)">
+              <span class="jjbt-icon">👥</span><span class="jjbt-lbl" style="color:#4d96ff">Invite</span>
             </button>
           </div>
-          <!-- Draw options (shown when draw active) -->
+
+          <!-- Draw options -->
           <div class="jjbt-draw-opts" id="jjbDrawOpts" style="display:none">
             <div class="jjbt-brushes">
-              <button class="jjbt-brush-btn active-brush" onclick="jjbSetBrush(3,this)" title="Fine">●</button>
-              <button class="jjbt-brush-btn" onclick="jjbSetBrush(6,this)" title="Medium" style="font-size:.9rem">●</button>
-              <button class="jjbt-brush-btn" onclick="jjbSetBrush(14,this)" title="Thick" style="font-size:1.3rem">●</button>
-              <button class="jjbt-brush-btn" onclick="jjbSetBrush(28,this)" title="Bold" style="font-size:1.8rem">●</button>
+              <button class="jjbt-brush-btn active-brush" onclick="jjbSetBrush(2,this)" style="font-size:.35rem" title="Fine">●</button>
+              <button class="jjbt-brush-btn" onclick="jjbSetBrush(5,this)" style="font-size:.65rem" title="Medium">●</button>
+              <button class="jjbt-brush-btn" onclick="jjbSetBrush(12,this)" style="font-size:1.1rem" title="Thick">●</button>
+              <button class="jjbt-brush-btn" onclick="jjbSetBrush(24,this)" style="font-size:1.6rem" title="Bold">●</button>
               <div class="jjbt-divider"></div>
-              <button class="jjbt-brush-btn" onclick="jjbSetEraser(this)" id="jjbEraserBtn" title="Eraser" style="font-size:1rem">◌</button>
+              <button class="jjbt-brush-btn" id="jjbEraserBtn" onclick="jjbSetEraser(this)" title="Eraser">◌</button>
             </div>
             <div class="jjbt-colors">
               <button class="jjbt-color-swatch active-swatch" style="background:#ffffff" onclick="jjbPickColor('#ffffff',this)"></button>
@@ -1182,25 +1224,27 @@ console.log('Supabase connected ✦');
               <button class="jjbt-color-swatch" style="background:#ffd93d" onclick="jjbPickColor('#ffd93d',this)"></button>
               <button class="jjbt-color-swatch" style="background:#6bcb77" onclick="jjbPickColor('#6bcb77',this)"></button>
               <button class="jjbt-color-swatch" style="background:#ff9ef0" onclick="jjbPickColor('#ff9ef0',this)"></button>
-              <button class="jjbt-color-swatch" style="background:#0a0818" onclick="jjbPickColor('#0a0818',this)"></button>
-              <label class="jjbt-color-swatch jjbt-custom-color" title="Custom color" style="overflow:hidden">
+              <button class="jjbt-color-swatch" style="background:#111;border:1px solid rgba(255,255,255,.15)" onclick="jjbPickColor('#111',this)"></button>
+              <label class="jjbt-color-swatch jjbt-custom-color" title="Custom">
                 <span style="font-size:.6rem;pointer-events:none">+</span>
-                <input type="color" id="jjbBrushColor" value="#ffffff" style="opacity:0;position:absolute;width:100%;height:100%;cursor:pointer" onchange="jjbPickColorVal(this.value)">
+                <input type="color" id="jjbBrushColorPick" value="#ffffff" style="opacity:0;position:absolute;width:100%;height:100%;cursor:pointer" onchange="jjbPickColorVal(this.value)">
               </label>
             </div>
-            <button class="jjbt-clear-draw" onclick="jjbClearDraw()">Clear drawing</button>
+            <button class="jjbt-clear-draw" onclick="jjbClearDraw()">Clear</button>
           </div>
-          <!-- Background row -->
+
+          <!-- Background presets -->
           <div class="jjbt-bg-row">
-            <span style="font-size:.68rem;color:var(--muted);letter-spacing:.06em">Background:</span>
-            <button class="jjbt-bg" style="background:#0a0818;border:2px solid rgba(255,255,255,.3)" onclick="jjbSetBg('#0a0818',this)" title="Dark"></button>
-            <button class="jjbt-bg" style="background:#1a1535" onclick="jjbSetBg('#1a1535',this)" title="Indigo"></button>
-            <button class="jjbt-bg" style="background:#fff4ee" onclick="jjbSetBg('#fff4ee',this)" title="Peach"></button>
-            <button class="jjbt-bg" style="background:#0f0e00" onclick="jjbSetBg('#0f0e00',this)" title="Dark gold"></button>
-            <button class="jjbt-bg" style="background:#f5f0ff" onclick="jjbSetBg('#f5f0ff',this)" title="Lavender"></button>
-            <button class="jjbt-bg" style="background:linear-gradient(135deg,#0a0818,#1a0e2e)" onclick="jjbSetBg('linear-gradient(135deg,#0a0818,#1a0e2e)',this)" title="Gradient"></button>
-            <label class="jjbt-bg" style="overflow:hidden;cursor:pointer" title="Custom">
-              <span style="font-size:.55rem;pointer-events:none;color:#fff">+</span>
+            <span style="font-size:.63rem;color:var(--muted);letter-spacing:.06em;flex-shrink:0">BG</span>
+            <button class="jjbt-bg active-bg" style="background:#0a0818" onclick="jjbSetBg('#0a0818',this)"></button>
+            <button class="jjbt-bg" style="background:#1a1535" onclick="jjbSetBg('#1a1535',this)"></button>
+            <button class="jjbt-bg" style="background:#fff4ee" onclick="jjbSetBg('#fff4ee',this)"></button>
+            <button class="jjbt-bg" style="background:#0d1a0d" onclick="jjbSetBg('#0d1a0d',this)"></button>
+            <button class="jjbt-bg" style="background:#f5f0ff" onclick="jjbSetBg('#f5f0ff',this)"></button>
+            <button class="jjbt-bg" style="background:linear-gradient(135deg,#0a0818,#1a0e2e)" onclick="jjbSetBg('linear-gradient(135deg,#0a0818,#1a0e2e)',this)"></button>
+            <button class="jjbt-bg" style="background:linear-gradient(135deg,#1a0e0e,#2e1a0e)" onclick="jjbSetBg('linear-gradient(135deg,#1a0e0e,#2e1a0e)',this)"></button>
+            <label class="jjbt-bg" style="cursor:pointer" title="Custom color">
+              <span style="font-size:.55rem;color:#fff;pointer-events:none">+</span>
               <input type="color" value="#0a0818" style="opacity:0;position:absolute;width:100%;height:100%;cursor:pointer" onchange="jjbSetBg(this.value)">
             </label>
           </div>
@@ -1215,8 +1259,8 @@ console.log('Supabase connected ✦');
         </div>
         <span style="font-size:.75rem;color:var(--muted);font-style:italic" id="pubHint">Only you can see this</span>
         <div style="display:flex;gap:.4rem;margin-left:auto;flex-wrap:wrap;align-items:center">
-          <button type="button" class="j-media-btn" onclick="jjbExport()" title="Download as HTML">⬇ Export</button>
-          <button class="btn-save-entry" onclick="saveEntry()" title="Save entry">Save ✦</button>
+          <button type="button" class="j-media-btn" onclick="jjbExport()">⬇ Export</button>
+          <button class="btn-save-entry" onclick="saveEntry()">Save ✦</button>
         </div>
       </div>
 
@@ -1732,8 +1776,11 @@ function showProfileModal(){
     +'<div class="profile-section"><div class="profile-section-title">Elements</div><div id="profileElementsDisplay"></div><div class="element-picker" id="elementPicker"><button type="button" class="el-btn" data-el="Fire" onclick="saveElement(&quot;Fire&quot;)" title="Fire">🔥 Fire</button><button type="button" class="el-btn" data-el="Water" onclick="saveElement(&quot;Water&quot;)" title="Water">🌊 Water</button><button type="button" class="el-btn" data-el="Air" onclick="saveElement(&quot;Air&quot;)" title="Air">💨 Air</button><button type="button" class="el-btn" data-el="Earth" onclick="saveElement(&quot;Earth&quot;)" title="Earth">🌿 Earth</button><button type="button" class="el-btn" data-el="Space" onclick="saveElement(&quot;Space&quot;)" title="Space / Void">✦ Space</button></div></div>'
     +'<div class="profile-section"><div class="profile-section-title">Links</div>'+linksHtml+'</div>'
     +'<div class="profile-section"><div class="profile-section-title">◈ My Journal Archive</div>'
-    +'<button onclick="document.getElementById(\'profileOverlay\').remove();showJournalCalendar()" style="width:100%;padding:.65rem;border-radius:12px;border:1px solid rgba(199,125,255,.25);background:rgba(199,125,255,.06);color:#c77dff;cursor:pointer;font-family:Cormorant Garamond,serif;font-size:.95rem;letter-spacing:.06em;transition:all .2s">📅 Open My Calendar</button>'
-    +'</div>'
+    +'<div style="display:flex;flex-direction:column;gap:.4rem">'
+    +'<button onclick="document.getElementById(\'profileOverlay\').remove();showJournalCalendar()" class="profile-action-btn" style="text-align:left;padding:.6rem .9rem">📅 Calendar — browse by date</button>'
+    +'<button onclick="document.getElementById(\'profileOverlay\').remove();showProfileAnalyze()" class="profile-action-btn" style="text-align:left;padding:.6rem .9rem">🔍 Analyze — find my patterns</button>'
+    +'<button onclick="document.getElementById(\'profileOverlay\').remove();showNewJournalModal()" class="profile-action-btn" style="text-align:left;padding:.6rem .9rem;border-color:rgba(107,203,119,.25);color:#6bcb77">＋ Start a New Journal</button>'
+    +'</div></div>'
     +'<div class="profile-section">'
     +'<div class="profile-section-title">Account</div>'
     +'<div style="display:flex;align-items:center;justify-content:space-between;padding:.6rem 0">'
@@ -4116,6 +4163,103 @@ function toggleEntryPublicFromProfile(id,btn){
   showFollowNotif('',entry.isPublic?'Entry shared ✦':'Entry set to private');
 }
 
+
+function showJournalSwitcher(){
+  var journals=getJournals();
+  var ov=document.createElement('div');ov.className='modal-overlay';
+  var box=document.createElement('div');box.className='modal-box';box.style.maxWidth='380px';
+  var html='<button onclick="this.closest(\'.modal-overlay\').remove()" style="position:absolute;top:1rem;right:1.2rem;background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.3rem">×</button>'
+    +'<p style="font-family:Cinzel Decorative,serif;font-size:.82rem;color:var(--accent);margin-bottom:.8rem">My Journals</p>';
+  if(!journals.length){
+    html+='<p style="color:var(--muted);font-style:italic;font-size:.85rem;margin-bottom:.8rem">No named journals yet</p>';
+  } else {
+    html+='<div style="display:flex;flex-direction:column;gap:.35rem;margin-bottom:.8rem">';
+    journals.forEach(function(j){
+      var isActive=activeJournalId===j.id;
+      var d=new Date(j.created).toLocaleDateString('en-US',{month:'short',year:'numeric'});
+      html+='<div style="display:flex;align-items:center;gap:.6rem;padding:.6rem .8rem;border-radius:10px;border:1px solid '+(isActive?j.color+'44':'var(--border)')+';background:'+(isActive?j.color+'10':'var(--surface)')+';cursor:pointer" onclick="setActiveJournal('+j.id+');this.closest(\'.modal-overlay\').remove()">'
+        +'<div style="width:10px;height:10px;border-radius:50%;background:'+j.color+';flex-shrink:0"></div>'
+        +'<div style="flex:1"><div style="font-size:.88rem;color:var(--text)">'+j.name+'</div><div style="font-size:.68rem;color:var(--muted)">'+j.type+' · '+d+'</div></div>'
+        +(isActive?'<span style="font-size:.65rem;color:'+j.color+';letter-spacing:.1em">active</span>':'')
+        +'</div>';
+    });
+    html+='</div>';
+  }
+  html+='<button onclick="this.closest(\'.modal-overlay\').remove();showNewJournalModal()" style="width:100%;padding:.55rem;border-radius:10px;border:1px solid rgba(107,203,119,.25);background:rgba(107,203,119,.06);color:#6bcb77;cursor:pointer;font-family:Cormorant Garamond,serif;font-size:.88rem">＋ New Journal</button>';
+  box.innerHTML=html;
+  ov.appendChild(box);document.body.appendChild(ov);
+  ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
+}
+
+// ─── New Journal Modal ────────────────────────────────────────────────────────
+function getJournals(){
+  try{return JSON.parse(localStorage.getItem('am_journals_'+(currentUser?currentUser.nick.toLowerCase():'x'))||'[]');}catch(e){return[];}
+}
+function saveJournals(j){
+  try{localStorage.setItem('am_journals_'+(currentUser?currentUser.nick.toLowerCase():'x'),JSON.stringify(j));}catch(e){}
+}
+function showNewJournalModal(){
+  var ov=document.createElement('div');ov.className='modal-overlay';ov.id='newJournalOv';
+  var today=new Date();
+  var defaultName=today.toLocaleDateString('en-US',{month:'long',year:'numeric'})+' Journal';
+  var box=document.createElement('div');box.className='modal-box';box.style.maxWidth='400px';
+  box.innerHTML='<button onclick="this.closest(\'.modal-overlay\').remove()" style="position:absolute;top:1rem;right:1.2rem;background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.3rem">×</button>'
+    +'<p style="font-family:Cinzel Decorative,serif;font-size:.88rem;color:var(--accent);margin-bottom:1rem">＋ Start a New Journal</p>'
+    +'<div class="f-group" style="margin-bottom:.8rem"><label class="f-label">Journal Name</label>'
+    +'<input type="text" id="newJournalName" class="f-input" value="'+defaultName+'" placeholder="e.g. Spring 2025, My Poetry Journal..."></div>'
+    +'<div class="f-group" style="margin-bottom:.8rem"><label class="f-label">Type</label>'
+    +'<div style="display:flex;gap:.4rem;flex-wrap:wrap">'
+    +'<button class="j-media-btn jt-btn active-type" data-type="personal" onclick="setJournalType(this)">Personal</button>'
+    +'<button class="j-media-btn jt-btn" data-type="creative" onclick="setJournalType(this)">Creative</button>'
+    +'<button class="j-media-btn jt-btn" data-type="dream" onclick="setJournalType(this)">Dream</button>'
+    +'<button class="j-media-btn jt-btn" data-type="project" onclick="setJournalType(this)">Project</button>'
+    +'<button class="j-media-btn jt-btn" data-type="gratitude" onclick="setJournalType(this)">Gratitude</button>'
+    +'</div></div>'
+    +'<div class="f-group" style="margin-bottom:1rem"><label class="f-label">Color</label>'
+    +'<div style="display:flex;gap:.5rem">'
+    +['#c77dff','#4d96ff','#6bcb77','#ffd93d','#ff6b6b','#ff9ef0'].map(function(col,i){
+      return'<button class="jjbt-color-swatch'+(i===0?' active-swatch':'')+'" style="background:'+col+';width:28px;height:28px" onclick="setJournalColor(\''+col+'\',this)"></button>';
+    }).join('')
+    +'</div></div>'
+    +'<button onclick="createNewJournal()" style="width:100%;padding:.7rem;border-radius:12px;border:none;background:linear-gradient(135deg,var(--accent),#4d96ff);color:#fff;cursor:pointer;font-family:Cormorant Garamond,serif;font-size:.95rem;font-weight:600;letter-spacing:.06em">Create Journal ✦</button>';
+  ov.appendChild(box);document.body.appendChild(ov);
+  ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
+}
+var _newJournalType='personal', _newJournalColor='#c77dff';
+function setJournalType(btn){
+  _newJournalType=btn.dataset.type;
+  document.querySelectorAll('.jt-btn').forEach(function(b){b.classList.remove('active-type');});
+  btn.classList.add('active-type');
+}
+function setJournalColor(col,btn){
+  _newJournalColor=col;
+  document.querySelectorAll('#newJournalOv .jjbt-color-swatch').forEach(function(b){b.classList.remove('active-swatch');});
+  btn.classList.add('active-swatch');
+}
+function createNewJournal(){
+  var name=document.getElementById('newJournalName').value.trim();
+  if(!name){document.getElementById('newJournalName').focus();return;}
+  var journals=getJournals();
+  var j={id:Date.now(),name:name,type:_newJournalType,color:_newJournalColor,created:new Date().toISOString()};
+  journals.unshift(j);saveJournals(journals);
+  var ov=document.getElementById('newJournalOv');if(ov)ov.remove();
+  showFollowNotif('','Journal "'+name+'" created ✦');
+  showTab('journal');
+  setTimeout(function(){setActiveJournal(j.id);},200);
+}
+var activeJournalId=null;
+function setActiveJournal(id){
+  activeJournalId=id;
+  var journals=getJournals();
+  var j=journals.find(function(x){return x.id===id;});
+  if(j){
+    var nameEl=document.getElementById('activeJournalName');
+    if(nameEl){nameEl.textContent=j.name;nameEl.style.color=j.color;}
+    var hintEl=document.getElementById('activeJournalHint');
+    if(hintEl)hintEl.textContent=j.type+' journal';
+  }
+}
+
 // ─── Update renderTwins to offer "Add as Twin" button ─────────────────────────
 
 function showProfilePortfolio(){
@@ -5178,330 +5322,547 @@ function jjbClearDraw(){
   if(jjbCtx&&jjbCanvas())jjbCtx.clearRect(0,0,jjbCanvas().width,jjbCanvas().height);
 }
 
-// ─── Junk Journal Board — clean rewrite ──────────────────────────────────────
-var jjbSel=null, jjbDrawing=false, jjbCtx=null, jjbPainting=false;
-var jjbBrushSize=6, jjbBrushColor='#ffffff', jjbEraserMode=false;
 
-function jjbBoard(){return document.getElementById('junkBoard');}
-function jjbCanvas(){return document.getElementById('jjbCanvas');}
-function jjbHideEmpty(){var e=document.getElementById('jjbEmpty');if(e)e.style.display='none';}
-function jjbDeselect(){if(jjbSel)jjbSel.classList.remove('sel');jjbSel=null;}
+// ═══════════════════════════════════════════════════════════════════════════
+// ARTIST'S MUSE — Creative Board Engine v3
+// Works on: Desktop, Android, iOS, Tablet — Pointer + Touch events
+// ═══════════════════════════════════════════════════════════════════════════
 
-function jjbInitCanvas(){
-  var cv=jjbCanvas(),b=jjbBoard();
-  if(!cv||!b)return;
-  if(b.offsetWidth>0){cv.width=b.offsetWidth;cv.height=b.offsetHeight;}
-  else{cv.width=640;cv.height=460;}
-  jjbCtx=cv.getContext('2d');
+var jjbState = {
+  sel: null,
+  drawing: false,
+  ctx: null,
+  painting: false,
+  brushSize: 5,
+  brushColor: '#ffffff',
+  eraser: false,
+  undoStack: [],
+  rotation: {}
+};
+
+function jjbBoard(){ return document.getElementById('junkBoard'); }
+function jjbCanvas(){ return document.getElementById('jjbCanvas'); }
+
+function jjbHideEmpty(){
+  var e = document.getElementById('jjbEmpty');
+  if(e) e.style.display = 'none';
 }
 
-// ── Make & drag ───────────────────────────────────────────────────────────────
-function jjbMakeEl(el,x,y){
-  var board=jjbBoard();if(!board)return;
+function jjbDeselect(){
+  if(jjbState.sel) jjbState.sel.classList.remove('sel');
+  jjbState.sel = null;
+  var bar = document.getElementById('jjbCtxBar');
+  if(bar) bar.style.display = 'none';
+}
+
+// ── Canvas init ──────────────────────────────────────────────────────────────
+function jjbInitCanvas(){
+  var cv = jjbCanvas(), b = jjbBoard();
+  if(!cv || !b) return;
+  var w = b.offsetWidth || 640, h = b.offsetHeight || 460;
+  cv.width = w; cv.height = h;
+  jjbState.ctx = cv.getContext('2d');
+}
+
+// ── Undo ─────────────────────────────────────────────────────────────────────
+function jjbPushUndo(){
+  var board = jjbBoard(); if(!board) return;
+  var cv = jjbCanvas();
+  var snap = {
+    items: board.querySelectorAll('.jjb-item').length,
+    bg: board.style.background,
+    draw: (cv && jjbState.ctx) ? cv.toDataURL() : null
+  };
+  // Store serialized state
+  var state = jjbGetState();
+  jjbState.undoStack.push(JSON.stringify(state));
+  if(jjbState.undoStack.length > 15) jjbState.undoStack.shift();
+  var btn = document.getElementById('jjbUndoBtn');
+  if(btn) btn.style.opacity = '1';
+}
+
+function jjbUndo(){
+  if(!jjbState.undoStack.length) return;
+  var prev = JSON.parse(jjbState.undoStack.pop());
+  jjbRestoreState(prev);
+  var btn = document.getElementById('jjbUndoBtn');
+  if(btn) btn.style.opacity = jjbState.undoStack.length ? '1' : '.4';
+}
+
+// ── Context bar ───────────────────────────────────────────────────────────────
+function jjbShowCtxBar(el){
+  var bar = document.getElementById('jjbCtxBar');
+  if(!bar) return;
+  var isText = el.classList.contains('jjb-text-el');
+  var isImg = !!el.querySelector('img');
+  document.getElementById('jjbCtxType').textContent = isText ? 'Text' : isImg ? 'Image' : 'Element';
+  var textOpts = document.getElementById('jjbCtxText');
+  var imgOpts = document.getElementById('jjbCtxImg');
+  if(textOpts) textOpts.style.display = isText ? 'flex' : 'none';
+  if(imgOpts) imgOpts.style.display = isImg ? 'flex' : 'none';
+  bar.style.display = 'flex';
+}
+
+function jjbCtxDelete(){
+  if(!jjbState.sel) return;
+  jjbPushUndo();
+  jjbState.sel.remove();
+  jjbState.sel = null;
+  var bar = document.getElementById('jjbCtxBar');
+  if(bar) bar.style.display = 'none';
+}
+
+function jjbCtxDuplicate(){
+  if(!jjbState.sel) return;
+  jjbPushUndo();
+  var el = jjbState.sel;
+  var clone = el.cloneNode(true);
+  clone.style.left = (parseInt(el.style.left)||0) + 24 + 'px';
+  clone.style.top = (parseInt(el.style.top)||0) + 24 + 'px';
+  clone.classList.remove('sel');
+  // Remove old chrome
+  clone.querySelectorAll('.jjb-del,.jjb-resize').forEach(function(n){ n.remove(); });
+  var board = jjbBoard();
+  board.appendChild(clone);
+  jjbWireEl(clone);
+  jjbDeselect();
+  jjbState.sel = clone;
+  clone.classList.add('sel');
+  jjbShowCtxBar(clone);
+}
+
+function jjbCtxForward(){
+  if(!jjbState.sel) return;
+  var z = parseInt(jjbState.sel.style.zIndex) || 3;
+  jjbState.sel.style.zIndex = z + 1;
+}
+
+function jjbCtxBack(){
+  if(!jjbState.sel) return;
+  var z = parseInt(jjbState.sel.style.zIndex) || 3;
+  jjbState.sel.style.zIndex = Math.max(1, z - 1);
+}
+
+function jjbCtxRotate(deg){
+  if(!jjbState.sel) return;
+  var id = jjbState.sel.dataset.rid || (jjbState.sel.dataset.rid = Date.now() + '');
+  jjbState.rotation[id] = (jjbState.rotation[id] || 0) + deg;
+  jjbState.sel.style.transform = 'rotate(' + jjbState.rotation[id] + 'deg)';
+}
+
+function jjbCtxTextSize(d){
+  if(!jjbState.sel) return;
+  var cur = parseFloat(jjbState.sel.style.fontSize) || 18;
+  jjbState.sel.style.fontSize = Math.max(10, Math.min(80, cur + d)) + 'px';
+}
+
+function jjbCtxTextColor(val){
+  if(!jjbState.sel) return;
+  jjbState.sel.style.color = val;
+}
+
+function jjbCtxEditText(){
+  if(!jjbState.sel) return;
+  var el = jjbState.sel;
+  el.contentEditable = 'true';
+  el.focus();
+  try {
+    var r = document.createRange(); r.selectNodeContents(el);
+    var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  } catch(e){}
+  el.style.outline = '2px solid rgba(199,125,255,.7)';
+  function done(){ el.contentEditable = 'false'; el.style.outline = ''; }
+  el.addEventListener('blur', done, {once:true});
+  el.addEventListener('keydown', function(e){ if(e.key==='Escape'){e.preventDefault();done();el.blur();} }, {once:true});
+}
+
+// ── Wire element (drag + select) ─────────────────────────────────────────────
+function jjbMakeEl(el, x, y){
+  var board = jjbBoard(); if(!board) return;
   jjbHideEmpty();
-  el.style.cssText=(el.style.cssText||'')+'position:absolute;left:'+(x||40)+'px;top:'+(y||40)+'px;z-index:3;cursor:grab;touch-action:none;user-select:none;';
-  // ×  delete button — high z-index so always clickable
-  var del=document.createElement('button');
-  del.className='jjb-del';del.innerHTML='&times;';del.style.zIndex='20';
-  del.addEventListener('pointerdown',function(e){
-    e.stopPropagation();e.preventDefault();
-    el.remove();if(jjbSel===el)jjbSel=null;
+  jjbPushUndo();
+  el.style.position = 'absolute';
+  el.style.left = (x || 40) + 'px';
+  el.style.top = (y || 40) + 'px';
+  el.style.zIndex = '3';
+
+  // Delete btn
+  var del = document.createElement('button');
+  del.className = 'jjb-del'; del.innerHTML = '&times;';
+  del.addEventListener('pointerdown', function(e){
+    e.stopPropagation(); e.preventDefault();
+    jjbPushUndo();
+    el.remove();
+    if(jjbState.sel === el) jjbState.sel = null;
+    jjbDeselect();
   });
   el.appendChild(del);
-  // resize handle
-  var rz=document.createElement('div');rz.className='jjb-resize';rz.style.zIndex='20';
+
+  // Resize handle
+  var rz = document.createElement('div'); rz.className = 'jjb-resize';
   el.appendChild(rz);
-  // Drag directly on the element
-  function startElDrag(clientX, clientY, pointerId){
-    if(jjbDrawing)return;
-    jjbDeselect();jjbSel=el;el.classList.add('sel');
-    el.style.cursor='grabbing';
-    var bRect=board.getBoundingClientRect();
-    var ox=clientX-bRect.left-parseInt(el.style.left||0);
-    var oy=clientY-bRect.top-parseInt(el.style.top||0);
-    function onMove(cx,cy){
-      var nx=cx-bRect.left-ox;
-      var ny=cy-bRect.top-oy;
-      el.style.left=Math.max(0,nx)+'px';
-      el.style.top=Math.max(0,ny)+'px';
-    }
-    // Pointer events (desktop + Android)
-    function onPMove(ev){if(ev.target!==del&&ev.target!==rz)onMove(ev.clientX,ev.clientY);}
-    function onPUp(){el.style.cursor='grab';el.removeEventListener('pointermove',onPMove);el.removeEventListener('pointerup',onPUp);}
-    try{el.setPointerCapture(pointerId);}catch(e2){}
-    el.addEventListener('pointermove',onPMove);
-    el.addEventListener('pointerup',onPUp);
-    // Touch events (iOS Safari fallback)
-    function onTMove(ev){ev.preventDefault();var t=ev.touches[0];onMove(t.clientX,t.clientY);}
-    function onTEnd(){el.style.cursor='grab';el.removeEventListener('touchmove',onTMove);el.removeEventListener('touchend',onTEnd);}
-    el.addEventListener('touchmove',onTMove,{passive:false});
-    el.addEventListener('touchend',onTEnd);
-  }
-  el.addEventListener('pointerdown',function(e){
-    if(jjbDrawing)return;
-    if(e.target===del||e.target===rz)return;
-    e.stopPropagation();
-    startElDrag(e.clientX,e.clientY,e.pointerId);
-  });
-  el.addEventListener('touchstart',function(e){
-    if(jjbDrawing)return;
-    if(e.target===del||e.target===rz)return;
-    e.stopPropagation();
-    var t=e.touches[0];
-    startElDrag(t.clientX,t.clientY,null);
-  },{passive:true});
+  var img = el.querySelector('img');
+  if(img) jjbWireResize(rz, img);
+
   board.appendChild(el);
-  jjbDeselect();jjbSel=el;el.classList.add('sel');
+  jjbWireEl(el);
+  jjbDeselect();
+  jjbState.sel = el; el.classList.add('sel');
+  jjbShowCtxBar(el);
 }
 
-// Resize helper — called per-image
-function jjbMakeResizable(rz,img){
-  rz.addEventListener('pointerdown',function(e){
-    e.stopPropagation();e.preventDefault();
-    rz.setPointerCapture(e.pointerId);
-    var sw=img.offsetWidth,sx=e.clientX;
-    function onR(ev){img.style.width=Math.max(60,sw+ev.clientX-sx)+'px';}
-    function offR(){rz.removeEventListener('pointermove',onR);rz.removeEventListener('pointerup',offR);}
-    rz.addEventListener('pointermove',onR);rz.addEventListener('pointerup',offR);
+function jjbWireEl(el){
+  el.style.touchAction = 'none';
+  el.style.userSelect = 'none';
+  el.style.cursor = 'grab';
+
+  el.addEventListener('pointerdown', function(e){
+    if(jjbState.drawing) return;
+    var del = el.querySelector('.jjb-del');
+    var rz = el.querySelector('.jjb-resize');
+    if(e.target === del || e.target === rz) return;
+
+    e.stopPropagation();
+    jjbDeselect();
+    jjbState.sel = el; el.classList.add('sel');
+    jjbShowCtxBar(el);
+    el.style.cursor = 'grabbing';
+    el.style.zIndex = String(parseInt(el.style.zIndex || 3) + 1);
+
+    var board = jjbBoard();
+    var br = board.getBoundingClientRect();
+    var ox = e.clientX - br.left - parseInt(el.style.left || 0);
+    var oy = e.clientY - br.top - parseInt(el.style.top || 0);
+
+    try { el.setPointerCapture(e.pointerId); } catch(ex){}
+
+    function onMove(ev){
+      el.style.left = Math.max(0, ev.clientX - br.left - ox) + 'px';
+      el.style.top = Math.max(0, ev.clientY - br.top - oy) + 'px';
+    }
+    function onUp(){ el.style.cursor = 'grab'; el.removeEventListener('pointermove', onMove); el.removeEventListener('pointerup', onUp); }
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerup', onUp);
+  });
+}
+
+function jjbWireResize(rz, img){
+  rz.addEventListener('pointerdown', function(e){
+    e.stopPropagation(); e.preventDefault();
+    try { rz.setPointerCapture(e.pointerId); } catch(ex){}
+    var sw = img.offsetWidth, sx = e.clientX;
+    function onR(ev){ img.style.width = Math.max(60, sw + ev.clientX - sx) + 'px'; }
+    function offR(){ rz.removeEventListener('pointermove', onR); rz.removeEventListener('pointerup', offR); }
+    rz.addEventListener('pointermove', onR);
+    rz.addEventListener('pointerup', offR);
   });
 }
 
 // ── Draw mode ─────────────────────────────────────────────────────────────────
 function jjbToggleDraw(){
-  jjbDrawing=!jjbDrawing;
-  var btn=document.getElementById('jjbDrawBtn');
-  var opts=document.getElementById('jjbDrawOpts');
-  var cv=jjbCanvas();
-  if(!cv)return;
-  if(!jjbCtx)jjbInitCanvas();
-  if(jjbDrawing){
-    if(btn)btn.classList.add('draw-active');
-    if(opts)opts.style.display='flex';
-    cv.style.pointerEvents='auto';cv.style.cursor='crosshair';cv.style.zIndex='10';
+  jjbState.drawing = !jjbState.drawing;
+  var btn = document.getElementById('jjbDrawBtn');
+  var opts = document.getElementById('jjbDrawOpts');
+  var cv = jjbCanvas();
+  if(!cv) return;
+  if(!jjbState.ctx) jjbInitCanvas();
+
+  if(jjbState.drawing){
+    if(btn){ btn.classList.add('draw-active'); btn.querySelector('.jjbt-lbl').textContent = 'Drawing'; }
+    if(opts) opts.style.display = 'flex';
+    cv.style.pointerEvents = 'auto';
+    cv.style.cursor = 'crosshair';
+    cv.style.zIndex = '10';
     jjbDeselect();
-    // hide drag cursors
-    var board=jjbBoard();if(board)board.querySelectorAll('.jjb-item').forEach(function(el){el.style.pointerEvents='none';});
+    jjbBoard().querySelectorAll('.jjb-item').forEach(function(el){ el.style.pointerEvents = 'none'; });
   } else {
-    if(btn)btn.classList.remove('draw-active');
-    if(opts)opts.style.display='none';
-    cv.style.pointerEvents='none';cv.style.cursor='default';cv.style.zIndex='2';
-    var board=jjbBoard();if(board)board.querySelectorAll('.jjb-item').forEach(function(el){el.style.pointerEvents='auto';});
+    if(btn){ btn.classList.remove('draw-active'); btn.querySelector('.jjbt-lbl').textContent = 'Draw'; }
+    if(opts) opts.style.display = 'none';
+    cv.style.pointerEvents = 'none';
+    cv.style.cursor = 'default';
+    cv.style.zIndex = '2';
+    jjbBoard().querySelectorAll('.jjb-item').forEach(function(el){ el.style.pointerEvents = 'auto'; });
   }
 }
 
-function jjbSetBrush(size,btn){
-  jjbBrushSize=size;jjbEraserMode=false;
-  document.querySelectorAll('.jjbt-brush-btn').forEach(function(b){b.classList.remove('active-brush');});
-  if(btn)btn.classList.add('active-brush');
-  document.getElementById('jjbEraserBtn').classList.remove('active-brush');
+function jjbSetBrush(size, btn){
+  jjbState.brushSize = size; jjbState.eraser = false;
+  document.querySelectorAll('.jjbt-brush-btn').forEach(function(b){ b.classList.remove('active-brush'); });
+  if(btn) btn.classList.add('active-brush');
+  var eb = document.getElementById('jjbEraserBtn'); if(eb) eb.classList.remove('active-brush');
 }
 function jjbSetEraser(btn){
-  jjbEraserMode=true;
-  document.querySelectorAll('.jjbt-brush-btn').forEach(function(b){b.classList.remove('active-brush');});
-  if(btn)btn.classList.add('active-brush');
+  jjbState.eraser = true;
+  document.querySelectorAll('.jjbt-brush-btn').forEach(function(b){ b.classList.remove('active-brush'); });
+  if(btn) btn.classList.add('active-brush');
 }
-function jjbPickColor(color,btn){
-  jjbBrushColor=color;jjbEraserMode=false;
-  document.querySelectorAll('.jjbt-color-swatch').forEach(function(b){b.classList.remove('active-swatch');});
-  if(btn)btn.classList.add('active-swatch');
+function jjbPickColor(color, btn){
+  jjbState.brushColor = color; jjbState.eraser = false;
+  document.querySelectorAll('.jjbt-color-swatch').forEach(function(b){ b.classList.remove('active-swatch'); });
+  if(btn) btn.classList.add('active-swatch');
 }
-function jjbPickColorVal(val){jjbBrushColor=val;jjbEraserMode=false;}
-function jjbSetBg(bg,btn){
-  var board=jjbBoard();if(!board)return;
-  board.style.background=bg;
-  document.querySelectorAll('.jjbt-bg').forEach(function(b){b.classList.remove('active-bg');});
-  if(btn)btn.classList.add('active-bg');
+function jjbPickColorVal(val){ jjbState.brushColor = val; jjbState.eraser = false; }
+function jjbSetBg(bg, btn){
+  var board = jjbBoard(); if(!board) return;
+  board.style.background = bg;
+  document.querySelectorAll('.jjbt-bg').forEach(function(b){ b.classList.remove('active-bg'); });
+  if(btn) btn.classList.add('active-bg');
 }
-function jjbClearDraw(){if(jjbCtx&&jjbCanvas())jjbCtx.clearRect(0,0,jjbCanvas().width,jjbCanvas().height);}
+function jjbClearDraw(){
+  if(jjbState.ctx && jjbCanvas()){
+    jjbPushUndo();
+    jjbState.ctx.clearRect(0, 0, jjbCanvas().width, jjbCanvas().height);
+  }
+}
 
-function jjbPtTouch(touch){
-  var cv=jjbCanvas();var r=cv.getBoundingClientRect();
-  return{x:(touch.clientX-r.left)*(cv.width/r.width),y:(touch.clientY-r.top)*(cv.height/r.height)};
-}
+// ── Draw point helpers ────────────────────────────────────────────────────────
 function jjbPt(e){
-  var cv=jjbCanvas();var r=cv.getBoundingClientRect();
-  return{x:(e.clientX-r.left)*(cv.width/r.width),y:(e.clientY-r.top)*(cv.height/r.height)};
+  var cv = jjbCanvas(); var r = cv.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * (cv.width / r.width), y: (e.clientY - r.top) * (cv.height / r.height) };
 }
-
-// Draw events on canvas (attached once)
-window.addEventListener('load',function(){
-  var cv=document.getElementById('jjbCanvas');if(!cv)return;
-  cv.addEventListener('pointerdown',function(e){
-    if(!jjbDrawing)return;
-    if(!jjbCtx)jjbInitCanvas();
-    jjbPainting=true;cv.setPointerCapture(e.pointerId);
-    var p=jjbPt(e);jjbCtx.beginPath();jjbCtx.moveTo(p.x,p.y);
-  });
-  cv.addEventListener('pointermove',function(e){
-    if(!jjbPainting||!jjbDrawing)return;
-    var p=jjbPt(e);
-    if(jjbEraserMode){jjbCtx.globalCompositeOperation='destination-out';jjbCtx.strokeStyle='rgba(0,0,0,1)';}
-    else{jjbCtx.globalCompositeOperation='source-over';jjbCtx.strokeStyle=jjbBrushColor;}
-    jjbCtx.lineWidth=jjbBrushSize;jjbCtx.lineCap='round';jjbCtx.lineJoin='round';
-    jjbCtx.lineTo(p.x,p.y);jjbCtx.stroke();jjbCtx.beginPath();jjbCtx.moveTo(p.x,p.y);
-  });
-  cv.addEventListener('pointerup',function(){jjbPainting=false;if(jjbCtx)jjbCtx.beginPath();});
-  cv.addEventListener('pointercancel',function(){jjbPainting=false;});
-  // Deselect on board click
-  var board=document.getElementById('junkBoard');
-  if(board)board.addEventListener('pointerdown',function(e){
-    if(e.target===board&&!jjbDrawing)jjbDeselect();
-  });
-});
+function jjbPtT(t){
+  var cv = jjbCanvas(); var r = cv.getBoundingClientRect();
+  return { x: (t.clientX - r.left) * (cv.width / r.width), y: (t.clientY - r.top) * (cv.height / r.height) };
+}
+function jjbStroke(p){
+  var ctx = jjbState.ctx; if(!ctx) return;
+  if(jjbState.eraser){ ctx.globalCompositeOperation = 'destination-out'; ctx.strokeStyle = 'rgba(0,0,0,1)'; }
+  else { ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = jjbState.brushColor; }
+  ctx.lineWidth = jjbState.brushSize;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.lineTo(p.x, p.y); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(p.x, p.y);
+}
 
 // ── Add items ─────────────────────────────────────────────────────────────────
 function jjbAddImage(input){
-  Array.from(input.files).forEach(function(file,i){
-    var reader=new FileReader();
-    reader.onload=function(ev){
-      var el=document.createElement('div');el.className='jjb-item';
-      var img=document.createElement('img');
-      img.src=ev.target.result;img.style.cssText='width:180px;height:auto;border-radius:6px;display:block;pointer-events:none;max-width:260px';
+  Array.from(input.files).forEach(function(file, i){
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      var el = document.createElement('div'); el.className = 'jjb-item';
+      var img = document.createElement('img');
+      img.src = ev.target.result;
+      img.style.cssText = 'width:180px;height:auto;border-radius:6px;display:block;pointer-events:none;max-width:260px';
       el.appendChild(img);
-      // resize handle added by jjbMakeEl, then wire it
-      jjbMakeEl(el,30+i*20,30+i*20);
-      jjbMakeResizable(el.querySelector('.jjb-resize'),img);
+      jjbMakeEl(el, 30 + i * 20, 30 + i * 20);
+      jjbWireResize(el.querySelector('.jjb-resize'), img);
     };
     reader.readAsDataURL(file);
   });
-  input.value='';
+  input.value = '';
 }
 
 function jjbAddUrl(){
-  var url=prompt('Paste any image URL (Pinterest, Unsplash, etc.):');if(!url)return;
-  var el=document.createElement('div');el.className='jjb-item';
-  var img=document.createElement('img');img.src=url;img.style.cssText='width:180px;height:auto;border-radius:6px;display:block;pointer-events:none';
-  el.appendChild(img);jjbMakeEl(el,60,60);jjbMakeResizable(el.querySelector('.jjb-resize'),img);
+  var url = prompt('Paste any image URL:'); if(!url) return;
+  var el = document.createElement('div'); el.className = 'jjb-item';
+  var img = document.createElement('img');
+  img.src = url; img.style.cssText = 'width:180px;height:auto;border-radius:6px;display:block;pointer-events:none';
+  el.appendChild(img); jjbMakeEl(el, 60, 60);
+  jjbWireResize(el.querySelector('.jjb-resize'), img);
 }
 
 function jjbAddGif(){
-  var ov=document.createElement('div');
-  ov.style.cssText='position:fixed;inset:0;z-index:400;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.65)';
-  var box=document.createElement('div');
-  box.style.cssText='background:rgba(10,8,28,.98);border:1px solid rgba(199,125,255,.3);border-radius:16px;padding:1.4rem;width:300px';
-  var t=document.createElement('p');t.textContent='Add a GIF';t.style.cssText='font-family:Cinzel Decorative,serif;font-size:.82rem;color:#c77dff;margin-bottom:.8rem';
-  var g1=document.createElement('button');g1.textContent='🔍 Search Giphy';g1.style.cssText='width:100%;padding:.6rem;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);color:#fff;cursor:pointer;margin-bottom:.4rem;font-family:Cormorant Garamond,serif;font-size:.9rem';g1.onclick=function(){window.open('https://giphy.com','_blank');};
-  var g2=document.createElement('button');g2.textContent='🔍 Search Tenor';g2.style.cssText=g1.style.cssText+'margin-bottom:.8rem';g2.onclick=function(){window.open('https://tenor.com','_blank');};
-  var hint=document.createElement('p');hint.textContent='Right-click the GIF → Copy image address, paste here:';hint.style.cssText='font-size:.72rem;color:rgba(255,255,255,.4);margin-bottom:.4rem';
-  var row=document.createElement('div');row.style.cssText='display:flex;gap:.4rem';
-  var inp=document.createElement('input');inp.type='text';inp.placeholder='https://media.giphy.com/...';inp.style.cssText='flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:.5rem .7rem;color:#fff;font-size:.85rem;outline:none';
-  var addBtn=document.createElement('button');addBtn.textContent='Add';addBtn.style.cssText='background:linear-gradient(135deg,#c77dff,#4d96ff);border:none;border-radius:8px;color:#fff;padding:.5rem .9rem;cursor:pointer';
-  addBtn.onclick=function(){
-    var url=inp.value.trim();if(!url)return;ov.remove();
-    var el=document.createElement('div');el.className='jjb-item';
-    var img=document.createElement('img');img.src=url;img.style.cssText='width:200px;height:auto;border-radius:6px;display:block;pointer-events:none';
-    el.appendChild(img);jjbMakeEl(el,60,60);jjbMakeResizable(el.querySelector('.jjb-resize'),img);
+  var ov = document.createElement('div'); ov.className = 'modal-overlay';
+  var box = document.createElement('div'); box.className = 'modal-box'; box.style.maxWidth = '320px';
+  box.innerHTML = '<p style="font-family:Cinzel Decorative,serif;font-size:.82rem;color:var(--accent);margin-bottom:.8rem">Add a GIF</p>'
+    +'<button id="gifG" style="width:100%;padding:.6rem;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:#fff;cursor:pointer;margin-bottom:.4rem;font-family:Cormorant Garamond,serif;font-size:.9rem">🔍 Open Giphy</button>'
+    +'<button id="gifT" style="width:100%;padding:.6rem;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:#fff;cursor:pointer;margin-bottom:.8rem;font-family:Cormorant Garamond,serif;font-size:.9rem">🔍 Open Tenor</button>'
+    +'<p style="font-size:.72rem;color:var(--muted);margin-bottom:.35rem;font-style:italic">Right-click GIF → Copy image address → paste here:</p>'
+    +'<div style="display:flex;gap:.4rem"><input id="gifIn" type="text" placeholder="https://media.giphy.com/..." class="f-input" style="flex:1;font-size:.82rem"><button id="gifAdd" style="background:linear-gradient(135deg,#c77dff,#4d96ff);border:none;border-radius:8px;color:#fff;padding:.45rem .8rem;cursor:pointer;font-size:.88rem">Add</button></div>'
+    +'<button onclick="this.closest(\'.modal-overlay\').remove()" style="width:100%;margin-top:.5rem;padding:.38rem;border-radius:50px;border:1px solid rgba(255,255,255,.08);background:transparent;color:var(--muted);cursor:pointer;font-family:Cormorant Garamond,serif;font-size:.82rem">Cancel</button>';
+  ov.appendChild(box); document.body.appendChild(ov);
+  ov.addEventListener('click', function(e){ if(e.target===ov) ov.remove(); });
+  document.getElementById('gifG').onclick = function(){ window.open('https://giphy.com','_blank'); };
+  document.getElementById('gifT').onclick = function(){ window.open('https://tenor.com','_blank'); };
+  document.getElementById('gifIn').focus();
+  document.getElementById('gifAdd').onclick = function(){
+    var url = document.getElementById('gifIn').value.trim(); if(!url) return;
+    ov.remove();
+    var el = document.createElement('div'); el.className = 'jjb-item';
+    var img = document.createElement('img'); img.src = url;
+    img.style.cssText = 'width:200px;height:auto;border-radius:6px;display:block;pointer-events:none';
+    el.appendChild(img); jjbMakeEl(el, 60, 60);
+    jjbWireResize(el.querySelector('.jjb-resize'), img);
   };
-  inp.addEventListener('keydown',function(e){if(e.key==='Enter')addBtn.click();});
-  var cancelBtn=document.createElement('button');cancelBtn.textContent='Cancel';cancelBtn.style.cssText='width:100%;margin-top:.5rem;padding:.4rem;border-radius:50px;border:1px solid rgba(255,255,255,.1);background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:Cormorant Garamond,serif;font-size:.82rem';cancelBtn.onclick=function(){ov.remove();};
-  row.appendChild(inp);row.appendChild(addBtn);
-  box.appendChild(t);box.appendChild(g1);box.appendChild(g2);box.appendChild(hint);box.appendChild(row);box.appendChild(cancelBtn);
-  ov.appendChild(box);document.body.appendChild(ov);
-  ov.addEventListener('pointerdown',function(e){if(e.target===ov)ov.remove();});
-  setTimeout(function(){inp.focus();},100);
+  document.getElementById('gifIn').addEventListener('keydown', function(e){ if(e.key==='Enter') document.getElementById('gifAdd').click(); });
 }
 
 function jjbAddMusic(){
-  var url=prompt('Paste a Spotify, YouTube, or SoundCloud link:');if(!url)return;
-  var el=document.createElement('div');el.className='jjb-item';
-  var isYT=/youtu/.test(url),isSP=/spotify/.test(url);
-  if(isYT){var m=url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);if(m){var ifr=document.createElement('iframe');ifr.src='https://www.youtube.com/embed/'+m[1];ifr.style.cssText='width:260px;height:146px;border:none;border-radius:8px;display:block;pointer-events:none';el.appendChild(ifr);jjbMakeEl(el,60,60);return;}}
-  if(isSP){var m2=url.match(/spotify\.com\/(track|album|playlist)\/([a-zA-Z0-9]+)/);if(m2){var ifr2=document.createElement('iframe');ifr2.src='https://open.spotify.com/embed/'+m2[1]+'/'+m2[2];ifr2.style.cssText='width:260px;height:80px;border:none;border-radius:12px;display:block;pointer-events:none';el.appendChild(ifr2);jjbMakeEl(el,60,60);return;}}
-  var card=document.createElement('div');card.className='jjb-music';
-  var short=url.replace(/https?:\/\/(www\.)?/,'').slice(0,28)+'…';
-  card.innerHTML='<span class="jjb-music-icon">🎵</span><div class="jjb-music-info"><div class="jjb-music-title">Music</div><a class="jjb-music-link" href="'+url+'" target="_blank">'+short+'</a></div>';
-  el.appendChild(card);jjbMakeEl(el,60,60);
+  var url = prompt('Paste Spotify, YouTube, or SoundCloud link:'); if(!url) return;
+  var el = document.createElement('div'); el.className = 'jjb-item';
+  var isYT = /youtu/.test(url), isSP = /spotify/.test(url);
+  if(isYT){ var m = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/); if(m){ var ifr=document.createElement('iframe'); ifr.src='https://www.youtube.com/embed/'+m[1]; ifr.style.cssText='width:260px;height:146px;border:none;border-radius:8px;display:block;pointer-events:none'; el.appendChild(ifr); jjbMakeEl(el,60,60); return; }}
+  if(isSP){ var m2=url.match(/spotify\.com\/(track|album|playlist)\/([a-zA-Z0-9]+)/); if(m2){ var ifr2=document.createElement('iframe'); ifr2.src='https://open.spotify.com/embed/'+m2[1]+'/'+m2[2]; ifr2.style.cssText='width:260px;height:80px;border:none;border-radius:12px;display:block;pointer-events:none'; el.appendChild(ifr2); jjbMakeEl(el,60,60); return; }}
+  var card=document.createElement('div'); card.className='jjb-music';
+  card.innerHTML='<span class="jjb-music-icon">🎵</span><div class="jjb-music-info"><div class="jjb-music-title">Music</div><a class="jjb-music-link" href="'+url+'" target="_blank">'+url.replace(/https?:\/\/(www\.)?/,'').slice(0,28)+'…</a></div>';
+  el.appendChild(card); jjbMakeEl(el,60,60);
 }
 
 function jjbAddText(){
-  var txt=prompt('Enter text:');if(!txt)return;
-  var el=document.createElement('div');el.className='jjb-item jjb-text-el';
-  el.textContent=txt;el.style.cssText='font-size:1.2rem;color:#ffffff;white-space:nowrap;padding:.2rem .4rem';
-  el.addEventListener('dblclick',function(e){e.stopPropagation();var t=prompt('Edit:',el.textContent);if(t!==null)el.textContent=t;});
-  jjbMakeEl(el,60,60);
+  var el = document.createElement('div');
+  el.className = 'jjb-item jjb-text-el';
+  el.textContent = 'Tap to edit...';
+  el.style.cssText = 'font-size:18px;color:#ffffff;white-space:pre-wrap;min-width:60px;max-width:260px;padding:.3rem .5rem;line-height:1.5';
+  jjbMakeEl(el, 60, 60);
+  setTimeout(function(){ jjbCtxEditText(); }, 150);
 }
 
-var JJB_STICKERS=['🙈','🙉','🙊','🐒','🐵','🦍','🦧','🍌','✦','◎','☽','✿','∞','꩜','♡','⭐','🌙','🔮','🌈','🌺','🦋','💫','🌸','🍄','🌊','🔥','💜','🌀','🪄','🫧','🌟','🎨','💎','🪬','🧿','⚡','🌑','🌕','🦅','🐺','🦊','🐍','🌙'];
+var JJB_STICKERS = ['🙈','🐒','🍌','✦','◎','☽','✿','∞','♡','⭐','🌙','🔮','🌈','🌺','🦋','💫','🌸','🍄','🌊','🔥','💜','🌀','🪄','🫧','🌟','🎨','💎','🪬','🧿','⚡','🌑','🌕','🦅','🐺','🦊','🐍','꩜','🎭','🫀','🦚','🌙','🕊','🌹','🩸','🫐','✨'];
 
 function jjbAddSticker(){
-  var ov=document.createElement('div');
-  ov.style.cssText='position:fixed;inset:0;z-index:400;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6)';
-  var inner=document.createElement('div');inner.style.cssText='background:rgba(10,8,28,.98);border:1px solid rgba(199,125,255,.3);border-radius:16px;padding:1rem;max-width:300px';
-  var grid=document.createElement('div');grid.style.cssText='display:flex;flex-wrap:wrap;gap:4px;margin-bottom:.5rem';
+  var ov = document.createElement('div'); ov.className = 'modal-overlay';
+  var inner = document.createElement('div'); inner.style.cssText = 'background:rgba(10,8,28,.98);border:1px solid rgba(199,125,255,.3);border-radius:16px;padding:1rem;max-width:300px;margin:auto;margin-top:20vh';
+  var grid = document.createElement('div'); grid.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;margin-bottom:.6rem';
   JJB_STICKERS.forEach(function(s){
-    var btn=document.createElement('button');btn.textContent=s;
-    btn.style.cssText='background:none;border:none;font-size:1.7rem;cursor:pointer;padding:3px;border-radius:6px;line-height:1';
-    btn.addEventListener('click',function(){
+    var btn = document.createElement('button'); btn.textContent = s;
+    btn.style.cssText = 'background:none;border:none;font-size:1.7rem;cursor:pointer;padding:3px;border-radius:6px;line-height:1;transition:transform .1s';
+    btn.addEventListener('pointerdown', function(e){ e.stopPropagation(); });
+    btn.addEventListener('click', function(){
       ov.remove();
-      var el=document.createElement('div');el.className='jjb-item jjb-text-el';
-      el.textContent=s;el.style.cssText='font-size:2rem;padding:0;line-height:1;cursor:grab';
-      jjbMakeEl(el,80,80);
+      var el = document.createElement('div'); el.className = 'jjb-item jjb-text-el';
+      el.textContent = s; el.style.cssText = 'font-size:2.2rem;padding:2px;line-height:1;cursor:grab';
+      jjbMakeEl(el, 80, 80);
     });
     grid.appendChild(btn);
   });
-  var cancel=document.createElement('button');cancel.textContent='Cancel';
-  cancel.style.cssText='width:100%;padding:.4rem;border-radius:50px;border:1px solid rgba(255,255,255,.1);background:transparent;color:rgba(255,255,255,.4);cursor:pointer;font-family:Cormorant Garamond,serif;font-size:.82rem';
-  cancel.onclick=function(){ov.remove();};
-  inner.appendChild(grid);inner.appendChild(cancel);
-  ov.appendChild(inner);
-  ov.addEventListener('pointerdown',function(e){if(e.target===ov)ov.remove();});
-  document.body.appendChild(ov);
+  var cancel = document.createElement('button'); cancel.textContent = 'Cancel';
+  cancel.style.cssText = 'width:100%;padding:.4rem;border-radius:50px;border:1px solid rgba(255,255,255,.1);background:transparent;color:var(--muted);cursor:pointer;font-family:Cormorant Garamond,serif;font-size:.82rem';
+  cancel.onclick = function(){ ov.remove(); };
+  inner.appendChild(grid); inner.appendChild(cancel);
+  ov.appendChild(inner); document.body.appendChild(ov);
+  ov.addEventListener('pointerdown', function(e){ if(e.target===ov) ov.remove(); });
 }
 
-// ── State save/restore/export ─────────────────────────────────────────────────
+// ── Invite to board ───────────────────────────────────────────────────────────
+function inviteToBoard(){
+  var url = window.location.href.split('?')[0] + '?collab=' + (currentUser ? currentUser.nick : 'guest');
+  var ov = document.createElement('div'); ov.className = 'modal-overlay';
+  var box = document.createElement('div'); box.className = 'modal-box'; box.style.maxWidth = '380px';
+  box.innerHTML = '<p style="font-family:Cinzel Decorative,serif;font-size:.88rem;color:var(--accent);margin-bottom:.6rem">👥 Invite a Friend</p>'
+    + '<p style="font-size:.82rem;color:var(--muted);line-height:1.65;margin-bottom:.8rem">Share this link with a friend to invite them to create together. They will need to sign up to collaborate.</p>'
+    + '<div style="display:flex;gap:.4rem;margin-bottom:.8rem"><input id="inviteUrlInput" type="text" value="'+url+'" style="flex:1;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:.5rem .7rem;color:#fff;font-size:.78rem;outline:none" readonly>'
+    + '<button onclick="navigator.clipboard.writeText(document.getElementById(\'inviteUrlInput\').value);this.textContent=\'Copied ✓\';setTimeout(function(){this.textContent=\'Copy\'},2000,this)" style="background:linear-gradient(135deg,#c77dff,#4d96ff);border:none;border-radius:8px;color:#fff;padding:.45rem .8rem;cursor:pointer;font-size:.82rem;white-space:nowrap">Copy</button>'
+    + '</div>'
+    + '<div style="border-top:1px solid var(--border);padding-top:.8rem">'
+    + '<p style="font-size:.72rem;color:var(--muted);margin-bottom:.5rem;letter-spacing:.06em;text-transform:uppercase">Or invite a twin directly</p>'
+    + (getMyTwins().length ? getMyTwins().slice(0,5).map(function(nick){ return '<button onclick="sendBoardInvite(\''+nick+'\')" style="display:inline-flex;align-items:center;gap:.4rem;padding:.35rem .8rem;border-radius:50px;border:1px solid rgba(199,125,255,.25);background:rgba(199,125,255,.06);color:#c77dff;cursor:pointer;font-family:Cormorant Garamond,serif;font-size:.82rem;margin:.15rem">@'+nick+'</button>'; }).join('') : '<p style="font-size:.8rem;color:var(--muted);font-style:italic">No twins yet — find them in the Twins tab</p>')
+    + '</div>'
+    + '<button onclick="this.closest(\'.modal-overlay\').remove()" style="width:100%;margin-top:.8rem;padding:.45rem;border-radius:50px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:Cormorant Garamond,serif;font-size:.85rem">Close</button>';
+  ov.appendChild(box); document.body.appendChild(ov);
+  ov.addEventListener('click', function(e){ if(e.target===ov) ov.remove(); });
+}
+
+function sendBoardInvite(nick){
+  var key = 'am_binvite_' + nick.toLowerCase();
+  var invites = []; try{ invites = JSON.parse(localStorage.getItem(key)||'[]'); }catch(e){}
+  if(invites.indexOf(currentUser.nick.toLowerCase()) === -1) invites.push(currentUser.nick.toLowerCase());
+  try{ localStorage.setItem(key, JSON.stringify(invites)); }catch(e){}
+  showFollowNotif('', 'Invite sent to @' + nick + ' ✦');
+}
+
+// ── State: save / restore / export ───────────────────────────────────────────
 function jjbGetState(){
-  var board=jjbBoard();if(!board)return null;
-  var items=[];
+  var board = jjbBoard(); if(!board) return null;
+  var items = [];
   board.querySelectorAll('.jjb-item').forEach(function(el){
-    var img=el.querySelector('img'),ifr=el.querySelector('iframe'),music=el.querySelector('.jjb-music');
-    var it={x:el.style.left,y:el.style.top};
-    if(music){var lnk=music.querySelector('a');it.type='music';it.url=lnk?lnk.href:'';it.label=(music.querySelector('.jjb-music-title')||{}).textContent||'Music';}
-    else if(img){it.type='image';it.src=img.src;it.w=img.style.width||'180px';}
-    else if(ifr){it.type='embed';it.src=ifr.src;it.w=ifr.style.width;it.h=ifr.style.height;}
-    else{it.type='text';it.text=el.textContent||'';it.fs=el.style.fontSize||'1.2rem';it.col=el.style.color||'#fff';}
+    var img = el.querySelector('img'), ifr = el.querySelector('iframe'), music = el.querySelector('.jjb-music');
+    var it = { x: el.style.left, y: el.style.top, z: el.style.zIndex, rot: el.style.transform };
+    if(music){ var lnk=music.querySelector('a'); it.type='music'; it.url=lnk?lnk.href:''; }
+    else if(ifr){ it.type='embed'; it.src=ifr.src; it.w=ifr.style.width; it.h=ifr.style.height; }
+    else if(img){ it.type='image'; it.src=img.src; it.w=img.style.width||'180px'; }
+    else { it.type='text'; it.text=el.textContent||''; it.fs=el.style.fontSize||'18px'; it.col=el.style.color||'#fff'; }
     items.push(it);
   });
-  var drawData=null;try{var cv=jjbCanvas();if(cv&&jjbCtx&&cv.width>0)drawData=cv.toDataURL();}catch(e){}
-  return{bg:board.style.background||'#0a0818',draw:drawData,items:items};
+  var drawData = null;
+  try{ var cv=jjbCanvas(); if(cv&&jjbState.ctx&&cv.width>0) drawData=cv.toDataURL(); }catch(e){}
+  return { bg: board.style.background||'#0a0818', draw: drawData, items: items };
 }
 
 function jjbRestoreState(state){
-  if(!state)return;var board=jjbBoard();if(!board)return;
-  board.querySelectorAll('.jjb-item').forEach(function(el){el.remove();});
-  board.style.background=state.bg||'#0a0818';
-  if(state.draw&&state.draw!=='data:,'){if(!jjbCtx)jjbInitCanvas();var img2=new Image();img2.onload=function(){if(jjbCtx)jjbCtx.drawImage(img2,0,0);};img2.src=state.draw;}
+  if(!state) return;
+  var board = jjbBoard(); if(!board) return;
+  board.querySelectorAll('.jjb-item').forEach(function(el){ el.remove(); });
+  board.style.background = state.bg || '#0a0818';
+  if(state.draw && state.draw !== 'data:,'){
+    if(!jjbState.ctx) jjbInitCanvas();
+    var img2 = new Image(); img2.onload = function(){ if(jjbState.ctx) jjbState.ctx.drawImage(img2,0,0); }; img2.src = state.draw;
+  }
   (state.items||[]).forEach(function(it){
-    var el=document.createElement('div');el.className='jjb-item';
-    var x=parseInt(it.x)||40,y=parseInt(it.y)||40;
-    if(it.type==='image'){var img=document.createElement('img');img.src=it.src;img.style.cssText='width:'+(it.w||'180px')+';height:auto;border-radius:6px;display:block;pointer-events:none';el.appendChild(img);jjbMakeEl(el,x,y);jjbMakeResizable(el.querySelector('.jjb-resize'),img);}
-    else if(it.type==='embed'){var ifr=document.createElement('iframe');ifr.src=it.src;ifr.style.cssText='width:'+(it.w||'260px')+';height:'+(it.h||'146px')+';border:none;border-radius:8px;display:block;pointer-events:none';el.appendChild(ifr);jjbMakeEl(el,x,y);}
-    else if(it.type==='music'){var card=document.createElement('div');card.className='jjb-music';var short=(it.url||'').replace(/https?:\/\/(www\.)?/,'').slice(0,28)+'…';card.innerHTML='<span class="jjb-music-icon">🎵</span><div class="jjb-music-info"><div class="jjb-music-title">'+(it.label||'Music')+'</div><a class="jjb-music-link" href="'+(it.url||'')+'" target="_blank">'+short+'</a></div>';el.appendChild(card);jjbMakeEl(el,x,y);}
-    else{el.classList.add('jjb-text-el');el.textContent=it.text||'';el.style.cssText='font-size:'+(it.fs||'1.2rem')+';color:'+(it.col||'#fff')+';white-space:nowrap;padding:.2rem .4rem';el.addEventListener('dblclick',function(e){e.stopPropagation();var t=prompt('Edit:',el.textContent);if(t!==null)el.textContent=t;});jjbMakeEl(el,x,y);}
+    var el = document.createElement('div'); el.className = 'jjb-item';
+    var x = parseInt(it.x)||40, y = parseInt(it.y)||40;
+    if(it.z) el.style.zIndex = it.z;
+    if(it.rot) el.style.transform = it.rot;
+    if(it.type==='image'){ var img=document.createElement('img'); img.src=it.src; img.style.cssText='width:'+(it.w||'180px')+';height:auto;border-radius:6px;display:block;pointer-events:none'; el.appendChild(img); jjbMakeEl(el,x,y); jjbWireResize(el.querySelector('.jjb-resize'),img); }
+    else if(it.type==='embed'){ var ifr=document.createElement('iframe'); ifr.src=it.src; ifr.style.cssText='width:'+(it.w||'260px')+';height:'+(it.h||'146px')+';border:none;border-radius:8px;display:block;pointer-events:none'; el.appendChild(ifr); jjbMakeEl(el,x,y); }
+    else if(it.type==='music'){ var card=document.createElement('div'); card.className='jjb-music'; var short=(it.url||'').replace(/https?:\/\/(www\.)?/,'').slice(0,28)+'…'; card.innerHTML='<span class="jjb-music-icon">🎵</span><div class="jjb-music-info"><div class="jjb-music-title">Music</div><a class="jjb-music-link" href="'+(it.url||'')+'" target="_blank">'+short+'</a></div>'; el.appendChild(card); jjbMakeEl(el,x,y); }
+    else{ el.classList.add('jjb-text-el'); el.textContent=it.text||''; el.style.cssText='font-size:'+(it.fs||'18px')+';color:'+(it.col||'#fff')+';white-space:pre-wrap;min-width:60px;max-width:260px;padding:.3rem .5rem;line-height:1.5'; jjbMakeEl(el,x,y); }
   });
   jjbDeselect();
-  var empty=document.getElementById('jjbEmpty');if(empty)empty.style.display=(state.items&&state.items.length)?'none':'flex';
+  var empty = document.getElementById('jjbEmpty');
+  if(empty) empty.style.display = (state.items&&state.items.length) ? 'none' : 'flex';
 }
 
 function jjbExport(){
-  var state=jjbGetState();if(!state)return;
-  var parts=['<!DOCTYPE html><html><head><meta charset="utf-8"><title>Journal Board</title><style>body{margin:0;background:'+state.bg+';position:relative;min-height:460px;overflow:hidden}</style><'+'/head><body>'];
+  var state = jjbGetState(); if(!state) return;
+  var parts = ['<!DOCTYPE html><html><head><meta charset="utf-8"><title>Journal Board</title><style>body{margin:0;background:'+state.bg+';position:relative;min-height:460px;overflow:hidden}<\/style><\/head><body>'];
   (state.items||[]).forEach(function(it){
-    if(it.type==='image')parts.push('<img src="'+it.src+'" style="position:absolute;left:'+it.x+';top:'+it.y+';width:'+it.w+';border-radius:6px">');
-    else if(it.type==='text')parts.push('<div style="position:absolute;left:'+it.x+';top:'+it.y+';font-size:'+it.fs+';color:'+it.col+';font-family:serif">'+it.text+'<'+'/div>');
+    var style = 'position:absolute;left:'+it.x+';top:'+it.y+';'+(it.rot?'transform:'+it.rot+';':'');
+    if(it.type==='image') parts.push('<img src="'+it.src+'" style="'+style+'width:'+it.w+';border-radius:6px">');
+    else if(it.type==='text') parts.push('<div style="'+style+'font-size:'+it.fs+';color:'+it.col+';font-family:serif;white-space:pre-wrap">'+it.text+'<\/div>');
   });
-  if(state.draw&&state.draw!=='data:,')parts.push('<img src="'+state.draw+'" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none">');
-  parts.push('<'+'/body><'+'/html>');
-  var blob=new Blob([parts.join('')],{type:'text/html'});
-  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='journal-board.html';a.click();
+  if(state.draw&&state.draw!=='data:,') parts.push('<img src="'+state.draw+'" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none">');
+  parts.push('<\/body><\/html>');
+  var blob = new Blob([parts.join('')], {type:'text/html'});
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'journal-board.html'; a.click();
 }
 
 function jjbClearBoard(){
-  var board=jjbBoard();if(!board)return;
-  board.querySelectorAll('.jjb-item').forEach(function(el){el.remove();});
-  if(jjbCtx)jjbCtx.clearRect(0,0,jjbCanvas().width,jjbCanvas().height);
-  var e=document.getElementById('jjbEmpty');if(e)e.style.display='flex';
-  board.style.background='#0a0818';jjbSel=null;
+  var board = jjbBoard(); if(!board) return;
+  board.querySelectorAll('.jjb-item').forEach(function(el){ el.remove(); });
+  if(jjbState.ctx) jjbState.ctx.clearRect(0,0,jjbCanvas().width,jjbCanvas().height);
+  var e = document.getElementById('jjbEmpty'); if(e) e.style.display = 'flex';
+  board.style.background = '#0a0818';
+  jjbState.sel = null;
 }
+
+// ── Canvas events — attached once on load ────────────────────────────────────
+window.addEventListener('load', function(){
+  var cv = document.getElementById('jjbCanvas'); if(!cv) return;
+
+  // Pointer (desktop + Android)
+  cv.addEventListener('pointerdown', function(e){
+    if(!jjbState.drawing) return;
+    if(!jjbState.ctx) jjbInitCanvas();
+    jjbState.painting = true;
+    try{ cv.setPointerCapture(e.pointerId); }catch(ex){}
+    var p = jjbPt(e); jjbState.ctx.beginPath(); jjbState.ctx.moveTo(p.x, p.y);
+  });
+  cv.addEventListener('pointermove', function(e){
+    if(!jjbState.painting || !jjbState.drawing) return;
+    jjbStroke(jjbPt(e));
+  });
+  cv.addEventListener('pointerup', function(){ jjbState.painting=false; if(jjbState.ctx) jjbState.ctx.beginPath(); });
+  cv.addEventListener('pointercancel', function(){ jjbState.painting=false; });
+
+  // Touch (iOS Safari fallback)
+  cv.addEventListener('touchstart', function(e){
+    if(!jjbState.drawing) return; e.preventDefault();
+    if(!jjbState.ctx) jjbInitCanvas();
+    jjbState.painting = true;
+    var p = jjbPtT(e.touches[0]); jjbState.ctx.beginPath(); jjbState.ctx.moveTo(p.x, p.y);
+  }, {passive:false});
+  cv.addEventListener('touchmove', function(e){
+    if(!jjbState.painting||!jjbState.drawing) return; e.preventDefault();
+    jjbStroke(jjbPtT(e.touches[0]));
+  }, {passive:false});
+  cv.addEventListener('touchend', function(){ jjbState.painting=false; if(jjbState.ctx) jjbState.ctx.beginPath(); });
+
+  // Deselect on board background click
+  var board = document.getElementById('junkBoard');
+  if(board) board.addEventListener('pointerdown', function(e){
+    if(e.target === board && !jjbState.drawing) jjbDeselect();
+  });
+});
 
 </script>
 </body>
