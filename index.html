@@ -1532,6 +1532,11 @@ console.log('Supabase connected ✦');
   <div class="tab-panel" id="tab-community">
     <!-- Upcoming events strip -->
     <div id="communityEventsStrip" style="margin-bottom:.8rem"></div>
+    <!-- Feed filter tabs -->
+    <div style="display:flex;gap:.3rem;margin-bottom:.8rem;background:rgba(255,255,255,.03);border-radius:10px;padding:.3rem">
+      <button id="feedTabAll" onclick="setFeedTab('all')" style="flex:1;padding:.4rem;border-radius:8px;border:none;background:rgba(199,125,255,.2);color:#c77dff;cursor:pointer;font-family:Cormorant Garamond,serif;font-size:.82rem;font-weight:600;transition:all .2s">✦ Everyone</button>
+      <button id="feedTabFollowing" onclick="setFeedTab('following')" style="flex:1;padding:.4rem;border-radius:8px;border:none;background:transparent;color:var(--muted);cursor:pointer;font-family:Cormorant Garamond,serif;font-size:.82rem;transition:all .2s">Following</button>
+    </div>
     <!-- Micro post composer -->
     <div id="microPostComposer" style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:.9rem 1rem;margin-bottom:1rem">
       <textarea id="microPostText" placeholder="What's on your mind? Share a thought, a line, a spark..." style="width:100%;background:transparent;border:none;color:var(--text);font-size:.9rem;font-family:Cormorant Garamond,serif;resize:none;outline:none;min-height:60px;line-height:1.6;box-sizing:border-box" maxlength="280"></textarea>
@@ -3638,6 +3643,17 @@ function renderCommunityEventsStrip(){
   html += '</div>';
   strip.innerHTML = html;
 }
+
+var currentFeedTab = 'all';
+
+function setFeedTab(tab){
+  currentFeedTab = tab;
+  var allBtn = document.getElementById('feedTabAll');
+  var folBtn = document.getElementById('feedTabFollowing');
+  if(allBtn){ allBtn.style.background = tab==='all'?'rgba(199,125,255,.2)':'transparent'; allBtn.style.color=tab==='all'?'#c77dff':'var(--muted)'; allBtn.style.fontWeight=tab==='all'?'600':'400'; }
+  if(folBtn){ folBtn.style.background = tab==='following'?'rgba(199,125,255,.2)':'transparent'; folBtn.style.color=tab==='following'?'#c77dff':'var(--muted)'; folBtn.style.fontWeight=tab==='following'?'600':'400'; }
+  renderCommunity();
+}
 function renderCommunity(){
   try{renderCommunityEventsStrip();}catch(e){}
   try{renderDiscoverPeople();}catch(e){}
@@ -3703,6 +3719,200 @@ function postReply(entryId){
   if(btn) btn.textContent = '💬 '+replies.length+' '+(replies.length===1?'reply':'replies');
   addRitualPoints('post', 'Posted a reply ✦');
 }
+
+
+function showSettingsModal(){
+  var ov = document.createElement('div'); ov.className='modal-overlay';
+  var box = document.createElement('div'); box.className='modal-box'; box.style.maxWidth='400px';
+
+  var title = document.createElement('p'); title.textContent='⚙ Settings';
+  title.style.cssText='font-family:Cinzel Decorative,serif;font-size:.88rem;color:var(--accent);margin-bottom:1.2rem';
+
+  var sections = [
+    {
+      label:'Privacy',
+      items:[
+        {label:'Private account', desc:'Only followers see your entries', key:'isPrivate', type:'toggle'},
+        {label:'Show in Discover', desc:'Others can find you in Community', key:'hideFromDiscover', invert:true, type:'toggle'},
+      ]
+    },
+    {
+      label:'Notifications',
+      items:[
+        {label:'Follow notifications', desc:'Show when someone follows you', key:'notifFollow', type:'toggle', default:true},
+        {label:'Reaction notifications', desc:'Show when someone reacts to your post', key:'notifReaction', type:'toggle', default:true},
+      ]
+    },
+    {
+      label:'Reading',
+      items:[
+        {label:'Save card history', desc:'Store drawn cards in your profile', key:'saveCards', type:'toggle', default:true},
+      ]
+    }
+  ];
+
+  sections.forEach(function(sec){
+    var secTitle = document.createElement('div');
+    secTitle.style.cssText = 'font-size:.62rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin:.9rem 0 .4rem';
+    secTitle.textContent = sec.label;
+    box.appendChild(secTitle);
+
+    sec.items.forEach(function(item){
+      var row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:.55rem 0;border-bottom:1px solid rgba(255,255,255,.05)';
+      var info = document.createElement('div');
+      info.innerHTML = '<div style="font-size:.85rem;color:var(--text)">'+item.label+'</div>'
+        +'<div style="font-size:.7rem;color:var(--muted)">'+item.desc+'</div>';
+      var val = currentUser[item.key];
+      if(val===undefined) val = item.default||false;
+      if(item.invert) val = !val;
+      var tog = document.createElement('div');
+      tog.className = 'toggle'+(val?' on':'');
+      tog.style.cssText = 'cursor:pointer;flex-shrink:0';
+      tog.onclick = function(){
+        var cur = currentUser[item.key];
+        if(cur===undefined) cur = item.default||false;
+        currentUser[item.key] = !cur;
+        tog.className = 'toggle'+((item.invert?!currentUser[item.key]:currentUser[item.key])?' on':'');
+        saveCurrentUser();
+      };
+      row.appendChild(info); row.appendChild(tog);
+      box.appendChild(row);
+    });
+  });
+
+  // Blocked users list
+  var blocked = currentUser._blocked||[];
+  if(blocked.length){
+    var blkTitle = document.createElement('div');
+    blkTitle.style.cssText = 'font-size:.62rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin:.9rem 0 .4rem';
+    blkTitle.textContent = 'Blocked Users';
+    box.appendChild(blkTitle);
+    blocked.forEach(function(nick){
+      var row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:.45rem 0;border-bottom:1px solid rgba(255,255,255,.04)';
+      var nm = document.createElement('span'); nm.style.cssText='font-size:.85rem;color:var(--text)'; nm.textContent='@'+nick;
+      var unblockBtn = document.createElement('button'); unblockBtn.textContent='Unblock';
+      unblockBtn.style.cssText='font-size:.72rem;padding:.25rem .65rem;border-radius:50px;border:1px solid rgba(107,203,119,.3);background:transparent;color:#6bcb77;cursor:pointer;font-family:Cormorant Garamond,serif';
+      unblockBtn.onclick=function(){
+        currentUser._blocked=(currentUser._blocked||[]).filter(function(n){return n!==nick;});
+        saveCurrentUser(); row.remove();
+        showFollowNotif('','@'+nick+' unblocked');
+      };
+      row.appendChild(nm); row.appendChild(unblockBtn);
+      box.appendChild(row);
+    });
+  }
+
+  var closeBtn = document.createElement('button'); closeBtn.textContent='Save & Close';
+  closeBtn.style.cssText='width:100%;padding:.65rem;border-radius:12px;border:none;background:linear-gradient(135deg,#c77dff,#4d96ff);color:#fff;cursor:pointer;font-family:Cormorant Garamond,serif;font-size:.9rem;font-weight:600;margin-top:1rem';
+  closeBtn.onclick=function(){ ov.remove(); showFollowNotif('','Settings saved ✦'); };
+
+  box.appendChild(title);
+  ov.appendChild(box); document.body.appendChild(ov);
+  ov.onclick=function(e){if(e.target===ov)ov.remove();};
+}
+function showUserProfile(nick){
+  if(!nick || nick.toLowerCase() === currentUser.nick.toLowerCase()) return;
+  var users = getUsers();
+  var u = users[nick.toLowerCase()];
+  var followData = getFollowData();
+  var me = currentUser.nick.toLowerCase();
+  var myFollowing = (followData[me]&&followData[me].following)||[];
+  var isFollowing = myFollowing.indexOf(nick.toLowerCase()) > -1;
+  var restricted = (currentUser._restricted||[]).indexOf(nick.toLowerCase()) > -1;
+
+  var ov = document.createElement('div'); ov.className='modal-overlay';
+  var box = document.createElement('div'); box.className='modal-box'; box.style.maxWidth='320px';
+
+  var initials = nick.slice(0,2).toUpperCase();
+  var ch = u&&u.chart||{};
+  var signs = ch.sunSign ? '☀ '+ch.sunSign+(ch.moonSign?' · ☽ '+ch.moonSign:'') : '';
+  var entryCount = 0;
+  try{ entryCount = JSON.parse(localStorage.getItem('am_entries_'+nick.toLowerCase())||'[]').filter(function(e){return e.isPublic;}).length; }catch(x){}
+
+  // Avatar
+  var avDiv = document.createElement('div');
+  avDiv.style.cssText='width:64px;height:64px;border-radius:50%;background:'+(u&&u.avatar?'url('+u.avatar+') center/cover':'linear-gradient(135deg,#c77dff,#4d96ff)')+';display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:700;color:#fff;margin:0 auto .7rem';
+  if(!(u&&u.avatar)) avDiv.textContent = initials;
+
+  var nameDiv = document.createElement('div'); nameDiv.style.cssText='text-align:center;margin-bottom:.3rem';
+  nameDiv.innerHTML = '<div style="font-family:Cinzel Decorative,serif;font-size:.85rem;color:var(--text)">@'+nick+'</div>'
+    +(signs?'<div style="font-size:.72rem;color:var(--muted);margin-top:.2rem">'+signs+'</div>':'')
+    +(entryCount?'<div style="font-size:.68rem;color:var(--muted);margin-top:.15rem">'+entryCount+' public entries</div>':'');
+
+  // Action buttons
+  var actions = document.createElement('div'); actions.style.cssText='display:flex;flex-direction:column;gap:.4rem;margin:.8rem 0';
+
+  function makeBtn(label, color, bg, onclick){
+    var btn = document.createElement('button');
+    btn.textContent = label;
+    btn.style.cssText='padding:.55rem;border-radius:10px;border:1px solid '+color+';background:'+bg+';color:'+color+';cursor:pointer;font-family:Cormorant Garamond,serif;font-size:.88rem;width:100%;transition:all .2s';
+    btn.onclick = onclick;
+    return btn;
+  }
+
+  // Follow / Unfollow
+  if(isFollowing){
+    actions.appendChild(makeBtn('✓ Following — Unfollow','rgba(255,255,255,.2)','rgba(255,255,255,.04)',function(){
+      unfollowUser(nick.toLowerCase(), null);
+      ov.remove(); showFollowNotif('','Unfollowed @'+nick);
+    }));
+  } else {
+    actions.appendChild(makeBtn('Follow ✦','rgba(199,125,255,.5)','rgba(199,125,255,.1)',function(){
+      followUser(nick.toLowerCase(), null);
+      ov.remove();
+    }));
+  }
+
+  // Add as Twin
+  var twins = getMyTwins();
+  var isTwin = twins.indexOf(nick.toLowerCase()) > -1;
+  actions.appendChild(makeBtn(isTwin?'∞ Remove Twin':'∞ Add as Twin',
+    isTwin?'rgba(255,255,255,.15)':'rgba(77,150,255,.4)',
+    isTwin?'transparent':'rgba(77,150,255,.08)',
+    function(){
+      if(isTwin){ removeTwin(nick.toLowerCase()); }
+      else { addTwin(nick.toLowerCase()); }
+      ov.remove();
+    }
+  ));
+
+  // Restrict
+  actions.appendChild(makeBtn(restricted?'🔓 Remove Restriction':'🚫 Restrict','rgba(255,179,71,.4)','rgba(255,179,71,.06)',function(){
+    if(!currentUser._restricted) currentUser._restricted = [];
+    if(restricted){
+      currentUser._restricted = currentUser._restricted.filter(function(n){return n!==nick.toLowerCase();});
+      showFollowNotif('','@'+nick+' restriction removed');
+    } else {
+      currentUser._restricted.push(nick.toLowerCase());
+      showFollowNotif('','@'+nick+' restricted — their content will be hidden');
+    }
+    saveCurrentUser();
+    ov.remove();
+  }));
+
+  // Block
+  actions.appendChild(makeBtn('⛔ Block','rgba(255,107,107,.4)','rgba(255,107,107,.06)',function(){
+    if(!confirm('Block @'+nick+'? They will not see your content and you will not see theirs.')) return;
+    if(!currentUser._blocked) currentUser._blocked = [];
+    if(currentUser._blocked.indexOf(nick.toLowerCase())<0) currentUser._blocked.push(nick.toLowerCase());
+    saveCurrentUser();
+    // Unfollow both ways
+    unfollowUser(nick.toLowerCase(), null);
+    ov.remove();
+    showFollowNotif('','@'+nick+' blocked');
+    renderCommunity();
+  }));
+
+  var closeBtn = document.createElement('button'); closeBtn.textContent='Close';
+  closeBtn.style.cssText='width:100%;padding:.4rem;border-radius:50px;border:1px solid rgba(255,255,255,.08);background:transparent;color:var(--muted);cursor:pointer;font-family:Cormorant Garamond,serif;font-size:.82rem;margin-top:.2rem';
+  closeBtn.onclick=function(){ov.remove();};
+
+  box.appendChild(avDiv); box.appendChild(nameDiv); box.appendChild(actions); box.appendChild(closeBtn);
+  ov.appendChild(box); document.body.appendChild(ov);
+  ov.onclick=function(e){if(e.target===ov)ov.remove();};
+}
 function renderDiscoverPeople(){
   var wrap = document.getElementById('discoverPeople');
   if(!wrap) return;
@@ -3726,7 +3936,14 @@ function _renderDiscoverList(allUsers){
   var me = currentUser ? currentUser.nick.toLowerCase() : '';
   var followData = getFollowData();
   var myFollowing = (followData[me]&&followData[me].following)||[];
-  var others = allUsers.filter(function(u){ return u.nick && u.nick.toLowerCase() !== me; });
+  var blocked2 = currentUser._blocked||[];
+  var others = allUsers.filter(function(u){
+    if(!u.nick) return false;
+    var n = u.nick.toLowerCase();
+    if(n === me) return false;
+    if(blocked2.indexOf(n)>-1) return false;
+    return true;
+  });
 
   if(!others.length){
     wrap.innerHTML='<p style="font-size:.78rem;color:var(--muted);font-style:italic;text-align:center;padding:.5rem">No other users yet — share the link ✦</p>';
@@ -3804,9 +4021,19 @@ function renderCommunityFeed(all){
   var myFollowing=(followData[me]&&followData[me].following)||[];
   all=all.filter(function(e){
     var nick=(e.nick||'').toLowerCase();
-    if(nick===me)return true;
+    if(nick===me) return true;
     var u=users[nick];
-    if(u&&u.isPrivate)return myFollowing.indexOf(nick)>-1;
+    if(u&&u.isPrivate) return myFollowing.indexOf(nick)>-1;
+    // Following tab: only show followed users
+    if(typeof currentFeedTab!=='undefined' && currentFeedTab==='following'){
+      return myFollowing.indexOf(nick)>-1;
+    }
+    // Hide blocked users
+    var blocked = (currentUser._blocked||[]);
+    if(blocked.indexOf(nick)>-1) return false;
+    // Hide restricted users' content
+    var restricted2 = (currentUser._restricted||[]);
+    if(restricted2.indexOf(nick)>-1) return false;
     return true;
   });
   feed.innerHTML='';
@@ -3816,8 +4043,8 @@ function renderCommunityFeed(all){
       ? '<span style="font-size:.58rem;padding:.08rem .4rem;border-radius:50px;background:rgba(77,150,255,.1);color:#4d96ff;border:1px solid rgba(77,150,255,.2);margin-left:.35rem">✦ post</span>'
       : '<span style="font-size:.58rem;padding:.08rem .4rem;border-radius:50px;background:rgba(199,125,255,.1);color:#c77dff;border:1px solid rgba(199,125,255,.2);margin-left:.35rem">✎ journal</span>';
     var replies=[];try{replies=JSON.parse(localStorage.getItem('am_replies_'+e.id)||'[]');}catch(xr){}
-    div.innerHTML='<div class="comm-author"><div class="comm-avatar">'+initials+'</div>'
-      +'<div><div class="comm-nick">@'+e.nick+contentBadge+'</div><div class="comm-signs">'+signs+'</div></div>'
+    div.innerHTML='<div class="comm-author"><div class="comm-avatar" onclick="showUserProfile(\''+e.nick+'\')" style="cursor:pointer" title="View profile">'+initials+'</div>'
+      +'<div><div class="comm-nick" onclick="showUserProfile(\''+e.nick+'\')" style="cursor:pointer">@'+e.nick+contentBadge+'</div><div class="comm-signs">'+signs+'</div></div>'
       +'<div style="display:flex;align-items:center;gap:.5rem;margin-left:auto">'+renderFollowBtn(e.nick)+'<span class="comm-date">'+ds+'</span></div></div>'
       +(e.text?'<p class="comm-text">'+e.text+'</p>':'')
       +(e.image?'<img class="comm-img" src="'+e.image+'" alt="artwork">':'')
@@ -6080,7 +6307,43 @@ function renderTwinsPage(){
     +(!hasEntries?'<p style="font-size:.82rem;color:var(--muted);font-style:italic;margin-bottom:1rem;background:rgba(199,125,255,.06);border:1px solid rgba(199,125,255,.15);border-radius:10px;padding:.8rem">Write a few journal entries first — the more you write, the more accurate your match will be.</p>':'')
     +'<button class="twin-btn" onclick="findTwins()">∞ Find My Creative Twin</button>'
     +'</div>'
+    +'<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:.9rem 1rem;margin-bottom:1rem">'
+    +'<div style="font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:.6rem">Add a twin by nickname</div>'
+    +'<div style="display:flex;gap:.4rem">'
+    +'<input type="text" id="addTwinInput" placeholder="@theirNickname" style="flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:.55rem .8rem;color:#fff;font-size:.88rem;outline:none;font-family:Cormorant Garamond,serif">'
+    +'<button id="addTwinBtn" style="padding:.55rem 1rem;border-radius:10px;border:none;background:linear-gradient(135deg,#c77dff,#4d96ff);color:#fff;cursor:pointer;font-family:Cormorant Garamond,serif;font-size:.88rem;font-weight:600">Add ∞</button>'
+    +'</div>'
+    +'</div>'
     +'<div id="twinsResults"></div>';
+  // Wire add-twin button
+  setTimeout(function(){
+    var inp = document.getElementById('addTwinInput');
+    var btn = document.getElementById('addTwinBtn');
+    if(!btn||!inp) return;
+    function doAddTwin(){
+      var nick = inp.value.trim().replace(/^@/,'').toLowerCase();
+      if(!nick){ inp.focus(); return; }
+      if(nick === currentUser.nick.toLowerCase()){
+        showFollowNotif('','You cannot add yourself ✦'); return;
+      }
+      // Check if user exists
+      var users = getUsers();
+      var found = users[nick];
+      if(!found && supabaseReady && window.supa){
+        // Try Supabase
+        window.supa.from('users').select('nick').eq('nick',nick).single().then(function(res){
+          if(res.data){ addTwin(res.data.nick); inp.value=''; renderTwinsPage(); }
+          else showFollowNotif('','User @'+nick+' not found ✦');
+        }).catch(function(){ showFollowNotif('','User @'+nick+' not found ✦'); });
+      } else if(found){
+        addTwin(found.nick); inp.value=''; renderTwinsPage();
+      } else {
+        showFollowNotif('','User @'+nick+' not found. Make sure they have registered ✦');
+      }
+    }
+    btn.onclick = doAddTwin;
+    inp.onkeydown = function(e){ if(e.key==='Enter') doAddTwin(); };
+  }, 100);
 }
 
 // Override renderTwins to show collaboration focus
