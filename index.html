@@ -1094,6 +1094,7 @@ console.log('Supabase connected ✦');
 
     <!-- Card scene — hidden until choice made -->
     <div id="oracleActive" style="display:none">
+    <div id="oracleProgressBar" style="margin-bottom:.7rem"></div>
     <!-- Today's sky strip -->
     <div id="todaysSkyStrip" style="margin-bottom:.8rem"></div>
       <div class="card-scene">
@@ -2498,6 +2499,222 @@ function initLang(){
   applyLang();
 }
 
+
+// ═══════════════════════════════════════════════════════════════
+// MOTIVATION SYSTEM — Streaks, Badges, Level-ups, Leaderboard
+// ═══════════════════════════════════════════════════════════════
+
+var RITUAL_POINTS = {task:10, draw:15, mirror:20, entry:5, card:3,
+  event:10, spread:20, read:2, like:1, post:3, streak:25, badge:50};
+
+var LEVELS = [
+  {name:'Wanderer',   emoji:'✦',  min:0,    color:'#aaa'},
+  {name:'Dreamer',    emoji:'🌸', min:20,   color:'#ff9ef0'},
+  {name:'Seeker',     emoji:'⭐', min:75,   color:'#ffd93d'},
+  {name:'Mystic',     emoji:'🌙', min:200,  color:'#c77dff'},
+  {name:'Oracle',     emoji:'🔮', min:500,  color:'#4d96ff'},
+  {name:'Sage',       emoji:'🌊', min:1000, color:'#4dc4ff'},
+  {name:'Luminary',   emoji:'☀️', min:2500, color:'#ffb347'},
+  {name:'Sovereign',  emoji:'👑', min:5000, color:'#ffd700'},
+];
+
+var BADGES = [
+  {id:'first_entry',    emoji:'✎',  name:'First Words',       desc:'Write your first journal entry',         condition:function(u,pts,entries,cards){return entries>=1;}},
+  {id:'card_week',      emoji:'🃏', name:'Daily Devotion',    desc:'Draw cards 7 days in a row',            condition:function(u,pts,entries,cards,streak){return streak>=7;}},
+  {id:'journal_10',     emoji:'📓', name:'Soul Scribe',       desc:'Write 10 journal entries',              condition:function(u,pts,entries){return entries>=10;}},
+  {id:'journal_30',     emoji:'🌿', name:'Sacred Chronicler', desc:'Write 30 journal entries',              condition:function(u,pts,entries){return entries>=30;}},
+  {id:'points_100',     emoji:'💫', name:'Rising Star',       desc:'Earn 100 ritual points',                condition:function(u,pts){return pts>=100;}},
+  {id:'points_500',     emoji:'🔮', name:'Mystic Soul',       desc:'Earn 500 ritual points',                condition:function(u,pts){return pts>=500;}},
+  {id:'points_1000',    emoji:'🌙', name:'Night Oracle',      desc:'Earn 1000 ritual points',               condition:function(u,pts){return pts>=1000;}},
+  {id:'first_circle',   emoji:'꩜',  name:'Circle Founder',    desc:'Create your first Spiral',              condition:function(u,pts,entries,cards,streak,circles){return circles>=1;}},
+  {id:'twin_found',     emoji:'∞',  name:'Twin Flame',        desc:'Add your first creative twin',          condition:function(u,pts,entries,cards,streak,circles,twins){return twins>=1;}},
+  {id:'streak_3',       emoji:'🔥', name:'On Fire',           desc:'3-day consecutive streak',              condition:function(u,pts,entries,cards,streak){return streak>=3;}},
+  {id:'streak_30',      emoji:'⚡', name:'Unstoppable',       desc:'30-day consecutive streak',             condition:function(u,pts,entries,cards,streak){return streak>=30;}},
+  {id:'full_chart',     emoji:'🌌', name:'Star Mapper',       desc:'Complete your birth chart',             condition:function(u){return !!(u.chart&&u.chart.risingSign);}},
+];
+
+// ── Streak tracking ─────────────────────────────────────────
+function getStreak(nick){
+  try{ return JSON.parse(localStorage.getItem('am_streak_'+(nick||'').toLowerCase())||'{"days":0,"lastDate":null}'); }catch(e){ return {days:0,lastDate:null}; }
+}
+
+function updateStreak(){
+  if(!currentUser) return;
+  var key = 'am_streak_'+currentUser.nick.toLowerCase();
+  var streak = getStreak(currentUser.nick);
+  var today = new Date().toDateString();
+  if(streak.lastDate === today) return; // already counted today
+
+  var yesterday = new Date(Date.now()-86400000).toDateString();
+  if(streak.lastDate === yesterday){
+    streak.days++;
+  } else if(!streak.lastDate){
+    streak.days = 1;
+  } else {
+    // Streak broken
+    var old = streak.days;
+    streak.days = 1;
+    if(old >= 3) showFollowNotif('','Streak reset after '+old+' days');
+  }
+  streak.lastDate = today;
+  try{ localStorage.setItem(key, JSON.stringify(streak)); }catch(e){}
+
+  // Bonus points for streaks
+  if(streak.days % 7 === 0){
+    addRitualPoints('streak', streak.days+'-day streak bonus! 🔥');
+  }
+  return streak;
+}
+
+// ── Badge checking ──────────────────────────────────────────
+function checkBadges(){
+  if(!currentUser) return;
+  var earned = currentUser.badges || [];
+  var pts = getRitualPoints(currentUser.nick).total;
+  var entries = [];
+  try{ entries = JSON.parse(localStorage.getItem('am_entries_'+currentUser.nick.toLowerCase())||'[]'); }catch(e){}
+  var cards = [];
+  try{ cards = JSON.parse(localStorage.getItem('am_cards_'+currentUser.nick.toLowerCase())||'[]'); }catch(e){}
+  var streak = getStreak(currentUser.nick).days;
+  var circles = getAllCircles().filter(function(c){ return c.founder===currentUser.nick.toLowerCase(); }).length;
+  var twins = getMyTwins().length;
+
+  var newBadges = [];
+  BADGES.forEach(function(b){
+    if(earned.indexOf(b.id) > -1) return; // already has it
+    try{
+      if(b.condition(currentUser, pts, entries.length, cards.length, streak, circles, twins)){
+        earned.push(b.id);
+        newBadges.push(b);
+      }
+    }catch(x){}
+  });
+
+  if(newBadges.length){
+    currentUser.badges = earned;
+    saveCurrentUser();
+    // Show badge unlock notification
+    setTimeout(function(){
+      newBadges.forEach(function(b, i){
+        setTimeout(function(){
+          showBadgeUnlock(b);
+        }, i * 1500);
+      });
+    }, 500);
+  }
+}
+
+function showBadgeUnlock(badge){
+  var n = document.createElement('div');
+  n.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(10,8,28,.98);border:1px solid rgba(199,125,255,.4);border-radius:16px;padding:.9rem 1.3rem;z-index:400;text-align:center;box-shadow:0 8px 32px rgba(199,125,255,.2);animation:fade-up .4s ease;min-width:220px';
+  n.innerHTML = '<div style="font-size:.58rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem">Badge Unlocked</div>'
+    + '<div style="font-size:2rem;margin-bottom:.25rem">'+badge.emoji+'</div>'
+    + '<div style="font-family:Cinzel Decorative,serif;font-size:.8rem;color:#c77dff;margin-bottom:.15rem">'+badge.name+'</div>'
+    + '<div style="font-size:.72rem;color:var(--muted)">'+badge.desc+'</div>'
+    + '<div style="margin-top:.5rem;font-size:.7rem;color:#ffd93d">+50 pts</div>';
+  document.body.appendChild(n);
+  addRitualPoints('badge', 'Badge: '+badge.name);
+  setTimeout(function(){ n.style.opacity='0'; n.style.transition='opacity .5s'; setTimeout(function(){n.remove();}, 500); }, 4000);
+}
+
+// ── Level-up notification ────────────────────────────────────
+function checkLevelUp(prevTotal, newTotal){
+  var prevLevel = null, newLevel = null;
+  for(var i=LEVELS.length-1;i>=0;i--){
+    if(prevTotal >= LEVELS[i].min && !prevLevel) prevLevel = LEVELS[i];
+    if(newTotal >= LEVELS[i].min && !newLevel) newLevel = LEVELS[i];
+  }
+  if(!prevLevel) prevLevel = LEVELS[0];
+  if(!newLevel) newLevel = LEVELS[0];
+  if(newLevel.name !== prevLevel.name){
+    showLevelUp(newLevel);
+  }
+}
+
+function showLevelUp(level){
+  var n = document.createElement('div');
+  n.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:500;display:flex;align-items:center;justify-content:center;animation:fade-up .3s ease';
+  var box = document.createElement('div');
+  box.style.cssText = 'background:rgba(10,8,28,.99);border:1px solid '+level.color+';border-radius:20px;padding:2rem 2.5rem;text-align:center;max-width:300px';
+  box.innerHTML = '<div style="font-size:.62rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:.8rem">Level Up</div>'
+    + '<div style="font-size:3.5rem;margin-bottom:.5rem">'+level.emoji+'</div>'
+    + '<div style="font-family:Cinzel Decorative,serif;font-size:1.2rem;color:'+level.color+';margin-bottom:.5rem">'+level.name+'</div>'
+    + '<div style="font-size:.82rem;color:var(--muted);line-height:1.6">You have reached a new level of creative ritual practice.</div>'
+    + '<button style="margin-top:1.2rem;padding:.6rem 1.8rem;border-radius:50px;border:none;background:linear-gradient(135deg,'+level.color+',#4d96ff);color:#fff;cursor:pointer;font-family:Cormorant Garamond,serif;font-size:.95rem;font-weight:600">Continue ✦</button>';
+  box.querySelector('button').onclick = function(){ n.remove(); };
+  n.appendChild(box); document.body.appendChild(n);
+  // Confetti-like sparkle
+  for(var i=0;i<12;i++){
+    (function(ii){
+      var s = document.createElement('div');
+      s.style.cssText = 'position:fixed;font-size:1.2rem;z-index:501;pointer-events:none;transition:all 1.5s ease;left:'+(20+Math.random()*60)+'%;top:40%';
+      s.textContent = ['✦','✧','⋆','✺','❋'][ii%5];
+      document.body.appendChild(s);
+      setTimeout(function(){ s.style.top=(10+Math.random()*60)+'%'; s.style.opacity='0'; }, 50);
+      setTimeout(function(){ s.remove(); }, 1600);
+    })(i);
+  }
+}
+
+// ── Updated addRitualPoints with level-up check ──────────────
+function addRitualPoints(type,label){
+  if(!currentUser) return;
+  var pts = getRitualPoints(currentUser.nick);
+  var prevTotal = pts.total;
+  var earn = RITUAL_POINTS[type] || 5;
+  pts.total += earn;
+  pts.log.unshift({type:type, label:label, points:earn, date:new Date().toISOString()});
+  if(pts.log.length > 100) pts.log = pts.log.slice(0,100);
+  try{ localStorage.setItem('am_ritual_pts_'+currentUser.nick.toLowerCase(), JSON.stringify(pts)); }catch(e){}
+  // Show floating +pts
+  showPointsFloat(earn);
+  // Check level up
+  checkLevelUp(prevTotal, pts.total);
+}
+
+function showPointsFloat(pts){
+  var el = document.createElement('div');
+  el.style.cssText = 'position:fixed;right:1.2rem;bottom:90px;font-family:Cinzel Decorative,serif;font-size:.85rem;color:#ffd93d;font-weight:700;z-index:400;pointer-events:none;transition:all .8s ease;opacity:1';
+  el.textContent = '+'+pts+' pts';
+  document.body.appendChild(el);
+  setTimeout(function(){ el.style.bottom='140px'; el.style.opacity='0'; }, 50);
+  setTimeout(function(){ el.remove(); }, 900);
+}
+
+// ── Ritual progress bar in oracle tab ───────────────────────
+function renderOracleProgress(){
+  var bar = document.getElementById('oracleProgressBar');
+  if(!bar || !currentUser) return;
+  var pts = getRitualPoints(currentUser.nick);
+  var lvl = getRitualLevel(pts.total);
+  var streak = getStreak(currentUser.nick);
+  var pct = lvl.next ? Math.min(100, Math.round((pts.total/lvl.next)*100)) : 100;
+  bar.innerHTML = '<div style="display:flex;align-items:center;gap:.7rem;padding:.6rem .8rem;background:rgba(255,255,255,.03);border-radius:12px;border:1px solid rgba(255,255,255,.06)">'
+    + '<span style="font-size:1.4rem">'+lvl.emoji+'</span>'
+    + '<div style="flex:1;min-width:0">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem">'
+    + '<span style="font-family:Cinzel Decorative,serif;font-size:.72rem;color:'+lvl.color+'">'+lvl.name+'</span>'
+    + '<span style="font-size:.68rem;color:var(--muted)">'+pts.total+' pts'+(lvl.next?' · '+lvl.next+' for next':'')+'</span>'
+    + '</div>'
+    + '<div style="height:4px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden">'
+    + '<div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,'+lvl.color+',#4d96ff);border-radius:2px;transition:width .5s ease"></div>'
+    + '</div>'
+    + '</div>'
+    + (streak.days>=2?'<div style="text-align:center;flex-shrink:0"><div style="font-size:1rem">🔥</div><div style="font-size:.58rem;color:#ff6b6b;font-weight:700">'+streak.days+'d</div></div>':'')
+    + '</div>';
+}
+
+// getRitualLevel defined in motivation block above
+
+
+
+
+
+
+
+
+
+
 function enterApp(){
   document.getElementById('authScreen').style.display='none';
   document.getElementById('appScreen').style.display='block';
@@ -2534,6 +2751,7 @@ function enterApp(){
   else if(micBtn){var ml=document.getElementById('micLang');if(ml)ml.style.display='block';}
   setTimeout(showInstallBanner,2000);
   setTimeout(renderTodaysSky, 500);
+  setTimeout(renderOracleProgress, 600);
   setTimeout(initAdmin, 100);
   setTimeout(initLang, 50);
   // Push state so back button works within app
@@ -2586,7 +2804,7 @@ function showTab(t){
   if(t==='mirror') renderMirrorPage();
   if(t==='circles') renderCirclesPage();
   if(t==='events') renderEventsPage();
-  if(t==='oracle') setTimeout(renderTodaysSky, 100);
+  if(t==='oracle'){ setTimeout(renderTodaysSky, 100); setTimeout(renderOracleProgress, 150); }
 }
 var timeMode='daily';
 var TM_LABELS={instant:'Reading the energy of this very moment',daily:'Your guide for the whole of today',weekly:'The thread weaving through your week',monthly:'The arc of this lunar cycle',yearly:'The overarching theme of your year'};
@@ -2833,7 +3051,7 @@ function confirmLetGo(){
   div.scrollIntoView({behavior:'smooth',block:'center'});
 }
 function showCard(card,emotions,reversed){
-  taskStates={};recordCardDraw(card);
+  taskStates={};recordCardDraw(card); updateStreak(); addRitualPoints('card','Card drawn 🃏'); checkBadges();
   var inner=document.getElementById('cardInner');
   inner.classList.remove('flipped');
   document.getElementById('reading').classList.remove('show');
@@ -3197,7 +3415,7 @@ function saveEntry(){
   document.getElementById('pubToggle').classList.remove('on');
   document.getElementById('pubLabel').textContent='Private';
   document.getElementById('pubHint').textContent='Only you can see this';
-  addRitualPoints('entry','Journal entry written');
+  updateStreak(); addRitualPoints('entry','Journal entry written ✎'); checkBadges();
   renderEntries();
   // Show save confirmation
   showFollowNotif('','Entry saved ✦');
@@ -6815,7 +7033,7 @@ function downloadAnalysisCard(){
 
 
 // ─── Creative Rituals Points System ───────────────────────────────────────────
-var RITUAL_POINTS={task:10,draw:15,mirror:20,entry:5,card:3,event:10,spread:20,read:2,like:1,post:3};
+// RITUAL_POINTS defined in motivation system
 
 function getRitualPoints(nick){
   try{return JSON.parse(localStorage.getItem('am_ritual_pts_'+nick.toLowerCase())||'{"total":0,"log":[]}');}catch(e){return{total:0,log:[]};}
@@ -6833,28 +7051,12 @@ function addRitualPointsForUser(nick, type, label){
   if(pts.log.length > 50) pts.log = pts.log.slice(0,50);
   try{ localStorage.setItem(key, JSON.stringify(pts)); }catch(e){}
 }
-function addRitualPoints(type,label){
-  if(!currentUser)return;
-  var pts=getRitualPoints(currentUser.nick);
-  var earn=RITUAL_POINTS[type]||5;
-  pts.total+=earn;
-  pts.log.unshift({type:type,label:label,points:earn,date:new Date().toISOString()});
-  if(pts.log.length>50)pts.log=pts.log.slice(0,50);
-  try{localStorage.setItem('am_ritual_pts_'+currentUser.nick.toLowerCase(),JSON.stringify(pts));}catch(e){}
-  // Show little notif
-  showFollowNotif('','+'+earn+' pts — '+label);
-}
-
-function getRitualLevel(total){
-  if(total>=500)return{name:'Oracle',emoji:'🔮',next:null};
-  if(total>=200)return{name:'Mystic',emoji:'🌙',next:500};
-  if(total>=75)return{name:'Seeker',emoji:'⭐',next:200};
-  if(total>=20)return{name:'Dreamer',emoji:'🌸',next:75};
-  return{name:'Wanderer',emoji:'✦',next:20};
-}
+// addRitualPoints defined in motivation system
 
 
-function showJournalSub(tab, btn) {
+
+
+function showJournalSub(tab, btn){
   document.getElementById('jsub-journal').style.display = tab==='journal' ? 'block' : 'none';
   var entriesEl = document.getElementById('jsub-entries');
   if(entriesEl) entriesEl.style.display = tab==='entries' ? 'block' : 'none';
