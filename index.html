@@ -146,6 +146,7 @@ body{background-image:radial-gradient(ellipse at 15% 20%,rgba(130,60,255,.07) 0%
 .f-hint{font-size:.77rem;color:var(--muted);font-style:italic;margin-top:.35rem;line-height:1.4}
 .f-err{color:#ff6b6b;font-size:.84rem;margin-top:.5rem;display:none}
 .f-err.show{display:block}
+.f-err.show{display:block}
 .btn-auth{width:100%;padding:.9rem;border-radius:50px;border:none;cursor:pointer;font-family:'Cormorant Garamond',serif;font-size:1.1rem;font-weight:600;letter-spacing:.08em;background:linear-gradient(135deg,#c77dff,#4d96ff,#6bcb77,#ffd93d,#ff6b6b,#c77dff);background-size:300% 300%;animation:rainbow-flow 4s ease infinite;color:#fff;margin-top:1rem;transition:transform .2s,box-shadow .2s;box-shadow:0 4px 24px rgba(150,80,255,.25)}
 .btn-auth:hover{transform:translateY(-2px);box-shadow:0 8px 36px rgba(150,80,255,.4)}
 .chart-badges{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.4rem}
@@ -275,6 +276,8 @@ body{background-image:radial-gradient(ellipse at 15% 20%,rgba(130,60,255,.07) 0%
 .entry-del{position:absolute;top:.8rem;right:.9rem;background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;transition:color .2s;line-height:1}
 .entry-del:hover{color:#ff6b6b}
 .community-feed{display:flex;flex-direction:column;gap:1.1rem}
+.reply-section{margin-top:.5rem;padding-top:.3rem;border-top:1px solid rgba(255,255,255,.05)}
+.reply-input-row{display:flex}
 .comm-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.2rem 1.3rem;animation:fade-up .3s ease}
 .comm-author{display:flex;align-items:center;gap:.6rem;margin-bottom:.75rem}
 .comm-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#c77dff,#4d96ff);display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;color:#fff;flex-shrink:0}
@@ -1091,6 +1094,8 @@ console.log('Supabase connected ✦');
 
     <!-- Card scene — hidden until choice made -->
     <div id="oracleActive" style="display:none">
+    <!-- Today's sky strip -->
+    <div id="todaysSkyStrip" style="margin-bottom:.8rem"></div>
       <div class="card-scene">
         <div class="card-inner" id="cardInner">
           <div class="c-back">
@@ -1539,6 +1544,13 @@ console.log('Supabase connected ✦');
         </div>
         <button onclick="saveMicroPost()" style="padding:.38rem .9rem;border-radius:50px;border:none;background:linear-gradient(135deg,var(--accent),#4d96ff);color:#fff;cursor:pointer;font-family:Cormorant Garamond,serif;font-size:.8rem;font-weight:600;letter-spacing:.04em">Post ✦</button>
       </div>
+    </div>
+    <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:.9rem 1rem;margin-bottom:.9rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.7rem">
+        <div style="font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted)">✦ Discover People</div>
+        <input type="text" placeholder="Search @nick..." oninput="searchPeople(this.value)" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:.28rem .65rem;color:#fff;font-size:.75rem;outline:none;width:130px;font-family:Cormorant Garamond,serif">
+      </div>
+      <div id="discoverPeople"></div>
     </div>
     <div id="followRequestsBox" style="display:none;background:rgba(199,125,255,.07);border:1px solid rgba(199,125,255,.25);border-radius:14px;padding:1rem 1.2rem;margin-bottom:1.2rem"></div>
     <div class="r-line" style="margin-top:0"></div>
@@ -2304,6 +2316,11 @@ var T = {
     'entry.delete_confirm':'Delete this entry?',
     'persona.switch':'Switch ✦','persona.create':'＋ Create New Self',
     'profile.entries':'Entries','profile.cards':'Cards Drawn','profile.followers':'Followers',
+    'community.post':'Post ✦','community.reply':'Reply','community.discover':'Discover People',
+    'community.follow':'Follow ✦','community.following':'Following',
+    'oracle.chooseTitle':'Choose your path','oracle.daily':'Daily','oracle.instant':'This Moment',
+    'events.create':'Create Event ✦','events.upcoming':'Upcoming','events.past':'Past','events.mine':'My Events',
+    'spiral.create':'Create a Spiral',
   },
   tr: {
     'nav.oracle':'Kehanet','nav.mirror':'Ayna','nav.journal':'Günlük',
@@ -2334,6 +2351,11 @@ var T = {
     'entry.delete_confirm':'Bu girişi sil?',
     'persona.switch':'Değiştir ✦','persona.create':'＋ Yeni Benlik Oluştur',
     'profile.entries':'Giriş','profile.cards':'Çekilen Kart','profile.followers':'Takipçi',
+    'community.post':'Paylaş ✦','community.reply':'Yanıtla','community.discover':'Kişileri Keşfet',
+    'community.follow':'Takip Et ✦','community.following':'Takip Ediliyor',
+    'oracle.chooseTitle':'Yolunu seç','events.create':'Etkinlik Oluştur ✦',
+    'events.upcoming':'Yaklaşan','events.past':'Geçmiş','events.mine':'Etkinliklerim',
+    'spiral.create':'Spiral Oluştur',
   },
   es: {
     'nav.oracle':'Oráculo','nav.mirror':'Espejo','nav.journal':'Diario',
@@ -2506,6 +2528,7 @@ function enterApp(){
   if(micBtn&&!isSpeechSupported()){micBtn.style.display='none';}
   else if(micBtn){var ml=document.getElementById('micLang');if(ml)ml.style.display='block';}
   setTimeout(showInstallBanner,2000);
+  setTimeout(renderTodaysSky, 500);
   setTimeout(initAdmin, 100);
   setTimeout(initLang, 50);
   // Push state so back button works within app
@@ -2558,12 +2581,32 @@ function showTab(t){
   if(t==='mirror') renderMirrorPage();
   if(t==='circles') renderCirclesPage();
   if(t==='events') renderEventsPage();
+  if(t==='oracle') setTimeout(renderTodaysSky, 100);
 }
 var timeMode='daily';
 var TM_LABELS={instant:'Reading the energy of this very moment',daily:'Your guide for the whole of today',weekly:'The thread weaving through your week',monthly:'The arc of this lunar cycle',yearly:'The overarching theme of your year'};
 var TM_CTX={instant:'This is a spontaneous present-moment reading. Speak to the energy of right now, this hour, this breath.',daily:'This is a daily reading. Speak to the energy of today.',weekly:'This is a weekly reading. Speak to the dominant energy of the entire week ahead.',monthly:'This is a monthly reading. Speak to the emotional arc of the coming month.',yearly:'This is a yearly reading. Speak to the grand theme and soul lesson of the entire year.'};
 function setTimeMode(m,btn){timeMode=m;document.querySelectorAll('.tm-btn').forEach(function(b){b.classList.remove('active');});btn.classList.add('active');document.getElementById('tmLabel').textContent=TM_LABELS[m];}
-function timeSeed(){var d=new Date();var base=0;if(timeMode==='instant')base=d.getFullYear()*1000000+(d.getMonth()+1)*10000+d.getDate()*100+d.getHours();else if(timeMode==='daily')base=d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();else if(timeMode==='weekly'){base=d.getFullYear()*1000+(d.getMonth()+1)*10+Math.floor(d.getDate()/7);}else if(timeMode==='monthly')base=d.getFullYear()*100+(d.getMonth()+1);else base=d.getFullYear();if(currentUser&&currentUser.chart&&currentUser.chart.birthDate){var bd=new Date(currentUser.chart.birthDate);base+=bd.getDate()*37+(bd.getMonth()+1)*13;}return base;}
+function timeSeed(){
+  var d=new Date(); var base=0;
+  if(timeMode==='instant') base=d.getFullYear()*1000000+(d.getMonth()+1)*10000+d.getDate()*100+d.getHours()*60+d.getMinutes();
+  else if(timeMode==='daily') base=d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();
+  else if(timeMode==='weekly') base=d.getFullYear()*1000+(d.getMonth()+1)*10+Math.floor(d.getDate()/7);
+  else if(timeMode==='monthly') base=d.getFullYear()*100+(d.getMonth()+1);
+  else base=d.getFullYear();
+  // User-specific salt — different card for each user
+  if(currentUser&&currentUser.nick){
+    var n=currentUser.nick;
+    for(var i=0;i<n.length;i++) base+=n.charCodeAt(i)*(i+7)*31;
+  }
+  if(currentUser&&currentUser.chart&&currentUser.chart.birthDate){
+    var bd=new Date(currentUser.chart.birthDate);
+    base+=bd.getDate()*37+(bd.getMonth()+1)*13+bd.getFullYear()*3;
+  }
+  return Math.abs(base);
+}
+
+
 var loading=false;var taskStates={};
 function chooseOracle(type){
   document.getElementById('oracleChoice').style.display='none';
@@ -2659,9 +2702,10 @@ function getMiniSymbol(type,h){
 async function fetchSpreadReading(spread){
   var ch=currentUser.chart||{};
   var hasBirth=!!(ch.sunSign&&ch.sunSign!=='Cosmic');
-  var chartCtx=hasBirth?('Sun: '+ch.sunSign+(ch.moonSign?', Moon: '+ch.moonSign:'')+(ch.risingSign?', Rising: '+ch.risingSign:'')):'no birth chart';
+  var chartCtx=hasBirth?('@'+currentUser.nick+' natal chart: Sun: '+ch.sunSign+(ch.moonSign?', Moon: '+ch.moonSign:'')+(ch.risingSign?', Rising: '+ch.risingSign:'')):'no birth chart';
+  var transitCtx = typeof getTransitContext !== 'undefined' ? getTransitContext() : '';
   var spreadDesc=spread.map(function(s){return s.position+': '+s.card.name+(s.reversed?' (reversed)':'');}).join(' | ');
-  var prompt='@'+currentUser.nick+(hasBirth?' — '+chartCtx:'')+'.\n\nThree-card spread drawn: '+spreadDesc+'.\n\nRespond ONLY with valid JSON:\n{"past":{"title":"Past","card":"'+spread[0].card.name+(spread[0].reversed?' Reversed':'')+'","reading":"3-4 sentences interpreting this card in the Past position'+(spread[0].reversed?' — reversed meaning, energy blocked or turned inward':'')+'"},"present":{"title":"Present","card":"'+spread[1].card.name+(spread[1].reversed?' Reversed':'')+'","reading":"3-4 sentences for Present position'+(spread[1].reversed?' reversed':'')+'"},"future":{"title":"Future","card":"'+spread[2].card.name+(spread[2].reversed?' Reversed':'')+'","reading":"3-4 sentences for Future position'+(spread[2].reversed?' reversed':'')+'"},"thread":"2-3 sentences weaving all three cards into one unified message for this person right now"}';
+  var prompt='@'+currentUser.nick+(hasBirth?' — '+chartCtx:'')+transitCtx+'.\n\nThree-card spread drawn: '+spreadDesc+'.\n\nRespond ONLY with valid JSON:\n{"past":{"title":"Past","card":"'+spread[0].card.name+(spread[0].reversed?' Reversed':'')+'","reading":"3-4 sentences interpreting this card in the Past position'+(spread[0].reversed?' — reversed meaning, energy blocked or turned inward':'')+'"},"present":{"title":"Present","card":"'+spread[1].card.name+(spread[1].reversed?' Reversed':'')+'","reading":"3-4 sentences for Present position'+(spread[1].reversed?' reversed':'')+'"},"future":{"title":"Future","card":"'+spread[2].card.name+(spread[2].reversed?' Reversed':'')+'","reading":"3-4 sentences for Future position'+(spread[2].reversed?' reversed':'')+'"},"thread":"2-3 sentences weaving all three cards into one unified message for this person right now"}';
   try{
     var res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1200,system:'You are a wise, poetic tarot reader. Use non-gendered language. Be evocative, specific, personal.',messages:[{role:'user',content:prompt}]})});
     var data=await res.json();
@@ -2797,10 +2841,198 @@ function showCard(card,emotions,reversed){
       document.getElementById('cFront').style.transform='';
     }
     fetchReading(card,emotions||[],reversed);
+    // Show redraw option after slight delay
+    setTimeout(function(){
+      var rdBtn = document.getElementById('redrawBtn');
+      if(!rdBtn){
+        rdBtn = document.createElement('button');
+        rdBtn.id = 'redrawBtn';
+        rdBtn.textContent = '↺ Draw Another';
+        rdBtn.style.cssText = 'display:block;margin:.7rem auto 0;background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:50px;color:var(--muted);cursor:pointer;font-family:Cormorant Garamond,serif;font-size:.82rem;padding:.4rem 1.1rem;transition:all .2s';
+        rdBtn.onmouseover = function(){ rdBtn.style.borderColor='rgba(199,125,255,.4)'; rdBtn.style.color='#c77dff'; };
+        rdBtn.onmouseout  = function(){ rdBtn.style.borderColor='rgba(255,255,255,.15)'; rdBtn.style.color='var(--muted)'; };
+        rdBtn.onclick = function(){
+          var card2 = CARDS[Math.floor(Math.random()*CARDS.length)];
+          var rev2 = isReversed();
+          rdBtn.remove();
+          showCard(card2,[],rev2);
+        };
+        var rdg = document.getElementById('reading');
+        if(rdg) rdg.appendChild(rdBtn);
+      }
+    }, 2000);
   },350);
 }
 function populateFront(card){document.getElementById('cNumber').textContent=card.number;document.getElementById('cName').textContent=card.name;document.getElementById('cSuit').textContent=card.suit;var h=card.hue;document.getElementById('cFront').style.background='linear-gradient(155deg,hsl('+h+',55%,10%) 0%,hsl('+(h+35)+',65%,16%) 45%,hsl('+(h+70)+',55%,12%) 100%)';drawSymbol(card.type,h);}
 function drawSymbol(type,h){var svg=document.getElementById('cSymbol');var a='hsl('+h+',85%,72%)';var b='hsl('+(h+55)+',80%,66%)';var c='hsl('+(h+120)+',75%,62%)';var shapes={major:'<circle cx="65" cy="65" r="48" fill="none" stroke="'+a+'" stroke-width="1.1" opacity=".7"/><polygon points="65,22 76,54 110,54 83,73 94,105 65,86 36,105 47,73 20,54 54,54" fill="none" stroke="'+a+'" stroke-width="1.3" opacity=".85"/><circle cx="65" cy="65" r="9" fill="'+b+'" opacity=".7"/>',wands:'<line x1="65" y1="12" x2="65" y2="118" stroke="'+a+'" stroke-width="2.8" stroke-linecap="round"/><line x1="32" y1="38" x2="98" y2="38" stroke="'+b+'" stroke-width="1.6" stroke-linecap="round" opacity=".7"/><line x1="36" y1="65" x2="94" y2="65" stroke="'+b+'" stroke-width="1.6" stroke-linecap="round" opacity=".7"/><line x1="32" y1="92" x2="98" y2="92" stroke="'+b+'" stroke-width="1.6" stroke-linecap="round" opacity=".7"/><circle cx="65" cy="12" r="5.5" fill="'+a+'"/><circle cx="65" cy="118" r="5.5" fill="'+a+'"/>',cups:'<path d="M38,44 Q65,22 92,44 Q98,76 65,96 Q32,76 38,44Z" fill="none" stroke="'+a+'" stroke-width="1.6" opacity=".85"/><line x1="65" y1="96" x2="65" y2="114" stroke="'+b+'" stroke-width="2.2" opacity=".7"/><line x1="42" y1="114" x2="88" y2="114" stroke="'+b+'" stroke-width="2.2" opacity=".7"/><circle cx="65" cy="62" r="14" fill="'+c+'" opacity=".25"/>',swords:'<line x1="65" y1="12" x2="65" y2="96" stroke="'+a+'" stroke-width="2.2" stroke-linecap="round"/><path d="M65,12 L56,26 M65,12 L74,26" stroke="'+a+'" stroke-width="1.7" fill="none" stroke-linecap="round"/><line x1="36" y1="76" x2="94" y2="76" stroke="'+b+'" stroke-width="2.8" stroke-linecap="round"/><ellipse cx="65" cy="102" rx="13" ry="7" fill="none" stroke="'+b+'" stroke-width="1.3" opacity=".6"/>',pentacles:'<circle cx="65" cy="65" r="46" fill="none" stroke="'+a+'" stroke-width="1.2" opacity=".65"/><polygon points="65,19 76,51 110,51 83,70 94,102 65,83 36,102 47,70 20,51 54,51" fill="none" stroke="'+b+'" stroke-width="1.3"/><circle cx="65" cy="65" r="17" fill="none" stroke="'+c+'" stroke-width="1.1" opacity=".6"/>'};svg.innerHTML=shapes[type]||shapes.major;}
+
+// ─── Real-time Planetary Transits ────────────────────────────────────────────
+
+
+function renderTodaysSky(){
+  var strip = document.getElementById('todaysSkyStrip');
+  if(!strip) return;
+  if(typeof Astronomy === 'undefined') return;
+  var transits = getCurrentTransits();
+  if(!transits) return;
+
+  var ch = currentUser && currentUser.chart || {};
+  var aspects = (ch.sunSign && ch.sunSign !== 'Cosmic') ? getTransitAspects(ch, transits) : [];
+  var PSYM = {Sun:'\u2600',Moon:'\u263D',Mercury:'\u263F',Venus:'\u2640',Mars:'\u2642',
+    Jupiter:'\u2643',Saturn:'\u2644',Uranus:'\u2645',Neptune:'\u2646',Pluto:'\u2647',NNode:'\u260A'};
+  var PCOL = {Sun:'#ffd93d',Moon:'#aad4f5',Mercury:'#c77dff',Venus:'#ff9ef0',Mars:'#ff6b6b',
+    Jupiter:'#ffb347',Saturn:'#c8a96e',Uranus:'#4dc4ff',Neptune:'#4d96ff',Pluto:'#9370db',NNode:'#6bcb77'};
+
+  strip.innerHTML = '';
+
+  var titleDiv = document.createElement('div');
+  titleDiv.style.cssText = 'font-size:.6rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:.5rem';
+  titleDiv.textContent = "Today\u2019s Sky";
+  strip.appendChild(titleDiv);
+
+  var pillRow = document.createElement('div');
+  pillRow.style.cssText = 'display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.5rem';
+  Object.keys(transits).forEach(function(p){
+    var t = transits[p];
+    if(!t||!t.sign) return;
+    var pill = document.createElement('span');
+    pill.style.cssText = 'font-size:.68rem;padding:.15rem .5rem;border-radius:50px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);color:var(--muted);white-space:nowrap';
+    pill.textContent = (PSYM[p]||p)+' '+t.sign+(t.retrograde?' ℞':'');
+    if(t.retrograde){ var r=document.createElement('span'); r.style.cssText='color:#ff6b6b;font-size:.6rem'; r.textContent=' ℞'; pill.textContent=(PSYM[p]||p)+' '+t.sign; pill.appendChild(r); }
+    pillRow.appendChild(pill);
+  });
+  strip.appendChild(pillRow);
+
+  if(aspects.length){
+    var box = document.createElement('div');
+    box.style.cssText = 'padding:.5rem .7rem;background:rgba(199,125,255,.06);border:1px solid rgba(199,125,255,.15);border-radius:10px';
+    var boxTitle = document.createElement('div');
+    boxTitle.style.cssText = 'font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:#c77dff;margin-bottom:.3rem';
+    boxTitle.textContent = 'Active in your chart now';
+    box.appendChild(boxTitle);
+    aspects.slice(0,3).forEach(function(a){
+      var aDiv = document.createElement('div');
+      aDiv.style.cssText = 'font-size:.72rem;color:var(--text);margin-bottom:.15rem';
+      aDiv.textContent = '\u2756 '+a;
+      box.appendChild(aDiv);
+    });
+    strip.appendChild(box);
+  }
+}
+
+
+function getCurrentTransits(){
+  // Returns current positions of all planets using Astronomy.js
+  if(typeof Astronomy === 'undefined') return null;
+  try{
+    var now = new Date();
+    var t = Astronomy.MakeTime(now);
+    var planets = ['Sun','Moon','Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto'];
+    var result = {};
+    planets.forEach(function(p){
+      try{
+        var lon = Astronomy.EclipticLongitude(Astronomy.Body[p], t);
+        result[p] = {sign: lonToSign(lon), lon: Math.round(lon*10)/10, deg: Math.round(((lon%30)+30)%30)};
+      }catch(e){}
+    });
+    // Retrograde check (approximate: compare position to 3 days ago)
+    try{
+      var t3ago = Astronomy.MakeTime(new Date(now - 3*86400000));
+      ['Mercury','Venus','Mars','Jupiter','Saturn'].forEach(function(p){
+        try{
+          var lonNow = Astronomy.EclipticLongitude(Astronomy.Body[p], t);
+          var lon3   = Astronomy.EclipticLongitude(Astronomy.Body[p], t3ago);
+          var diff = lonNow - lon3;
+          if(diff < -180) diff += 360;
+          if(diff > 180)  diff -= 360;
+          if(result[p]) result[p].retrograde = diff < 0;
+        }catch(e){}
+      });
+    }catch(e){}
+    // Mean North Node
+    try{
+      var jd = now/86400000 + 2440587.5;
+      var nlon = (125.0445 - 0.0529539*(jd-2451545.0));
+      result['NNode'] = {sign: lonToSign(((nlon%360)+360)%360), retrograde: true};
+    }catch(e){}
+    return result;
+  }catch(e){ return null; }
+}
+
+function formatTransits(transits){
+  if(!transits) return '';
+  var PSYM = {Sun:'☀',Moon:'☽',Mercury:'☿',Venus:'♀',Mars:'♂',Jupiter:'♃',Saturn:'♄',Uranus:'♅',Neptune:'♆',Pluto:'♇',NNode:'☊'};
+  var parts = [];
+  Object.keys(transits).forEach(function(p){
+    var t = transits[p];
+    if(t && t.sign){
+      parts.push((PSYM[p]||p)+' in '+t.sign+(t.retrograde?' ℞':''));
+    }
+  });
+  return parts.join(', ');
+}
+
+function getTransitAspects(natal, transits){
+  // Find significant conjunctions/oppositions/squares between natal and transit planets
+  if(!natal||!transits) return [];
+  var aspects = [];
+  var natalPlanets = {};
+  var PSYM = {Sun:'☀',Moon:'☽',Mercury:'☿',Venus:'♀',Mars:'♂',Jupiter:'♃',Saturn:'♄',Uranus:'♅',Neptune:'♆',Pluto:'♇'};
+
+  // Build natal planet positions (approximate from sign center)
+  var SIGN_LONS = {Aries:15,Taurus:45,Gemini:75,Cancer:105,Leo:135,Virgo:165,
+                   Libra:195,Scorpio:225,Sagittarius:255,Capricorn:285,Aquarius:315,Pisces:345};
+
+  function natalLon(sign){ return SIGN_LONS[sign] || 0; }
+
+  if(natal.sunSign) natalPlanets['☀ Sun'] = natalLon(natal.sunSign);
+  if(natal.moonSign) natalPlanets['☽ Moon'] = natalLon(natal.moonSign);
+  if(natal.risingSign) natalPlanets['↑ Rising'] = natalLon(natal.risingSign);
+  Object.keys(natal.planets||{}).forEach(function(p){
+    if(PSYM[p]) natalPlanets[(PSYM[p]||'')+' '+p] = natalLon(natal.planets[p]);
+  });
+
+  // Check transit vs natal aspects (orb 8°)
+  Object.keys(transits).forEach(function(tp){
+    var tLon = transits[tp].lon;
+    if(!tLon) return;
+    Object.keys(natalPlanets).forEach(function(np){
+      var nLon = natalPlanets[np];
+      var diff = Math.abs(((tLon - nLon + 180 + 360) % 360) - 180);
+      var aspect = null;
+      var orb = 8;
+      if(diff < orb) aspect = 'conjunct';
+      else if(Math.abs(diff-180) < orb) aspect = 'opposing';
+      else if(Math.abs(diff-90) < orb) aspect = 'squaring';
+      else if(Math.abs(diff-120) < orb) aspect = 'trining';
+      else if(Math.abs(diff-60) < orb) aspect = 'sextiling';
+      if(aspect){
+        var tName = (PSYM[tp]||'')+' '+tp+(transits[tp].retrograde?' ℞':'');
+        aspects.push('Transit '+tName+' '+aspect+' natal '+np);
+      }
+    });
+  });
+  return aspects.slice(0,5); // top 5 most significant
+}
+
+function getTransitContext(){
+  var transits = getCurrentTransits();
+  if(!transits) return '';
+  var ch = currentUser.chart || {};
+  var hasBirth = ch.sunSign && ch.sunSign !== 'Cosmic';
+
+  var ctx = '\n\nCURRENT SKY (today\'s planetary positions): ' + formatTransits(transits) + '.';
+
+  if(hasBirth){
+    var aspects = getTransitAspects(ch, transits);
+    if(aspects.length){
+      ctx += '\nACTIVE ASPECTS between today\'s sky and their natal chart: ' + aspects.join('; ') + '.';
+      ctx += '\nThis is critically important: these active aspects are the KEY themes for this reading. Weave them in specifically and concretely — these are the real astrological weather this person is living through right now.';
+    }
+  }
+  return ctx;
+}
+
 async function fetchReading(card,emotions,reversed){
   var reversedCtx=reversed?'\n\nThis card is REVERSED. Interpret the reversed meaning — energy turned inward, blocked, or expressing as shadow. Acknowledge the reversal subtly and weave it into the reading without being harsh.':'';
   var emotionCtx=(emotions&&emotions.length)?'\n\nBefore drawing this card, the person named these feelings present in them right now: '+emotions.join(', ')+'. Do NOT analyse or explain these emotions. Simply honour them as the emotional ground from which this reading emerges. Let them quietly inform the tone and texture of your reading without naming them back explicitly.':'';
@@ -2820,11 +3052,12 @@ async function fetchReading(card,emotions,reversed){
   var chartCtx=hasBirthData
     ?('@'+currentUser.nick+' natal chart — Sun: '+ch.sunSign+(ch.moonSign?', Moon: '+ch.moonSign:'')+(ch.risingSign?', Rising: '+ch.risingSign:'')+planetStr+elStr+'.')
     :('@'+currentUser.nick+' — no birth chart yet. Do not reference any zodiac signs. Read only for the card energy.');
+  var transitCtx = getTransitContext();
   var ANGEL_NUMS=['111','222','333','444','555','666','777','888','999','100','200','300','400','500','600','700','800','900'];
   var seed=Math.abs(timeSeed());
   var ga=function(o){return ANGEL_NUMS[(seed+o)%ANGEL_NUMS.length];};
   var angels={life:ga(0),relationships:ga(1),friendships:ga(2),work:ga(3),health:ga(4),money:ga(5)};
-  var prompt=chartCtx+emotionCtx+reversedCtx+'\n\nThey drew the "'+card.name+'" card ('+card.suit+')'+(reversed?' — REVERSED':'')+' for a present-moment reading.\n\nAngel numbers assigned for today: life='+angels.life+', relationships='+angels.relationships+', friendships='+angels.friendships+', work='+angels.work+', health='+angels.health+', money='+angels.money+'.\n\nRespond ONLY with valid JSON, no markdown:\n{"interpretation":"4-6 rich poetic sentences interpreting this card for this present-moment reading, weaving in their sun, moon, rising signs specifically. Be evocative and personal. Reference what this card calls them toward creatively and spiritually.","chartNote":"2 sentences: how their specific chart combination amplifies this card today","mantra":"a beautiful Buddhist-inspired mantra, may include Sanskrit, 1-2 lines, deeply resonant with this card energy","loveLetter":{"intro":"2-3 warm sentences addressed to @'+currentUser.nick+' opening the love letter, connecting their whole being to this card","life":{"message":"3-4 sentences about their overall life path and soul journey right now","angelMeaning":"what '+angels.life+' means for them specifically today"},"relationships":{"message":"3-4 sentences about love and romantic connections","angelMeaning":"what '+angels.relationships+' means for their love life"},"friendships":{"message":"3-4 sentences about friendships, community and soul tribe","angelMeaning":"what '+angels.friendships+' means for their friendships"},"work":{"message":"3-4 sentences about creative work, career and artistic calling","angelMeaning":"what '+angels.work+' means for their work and creativity"},"health":{"message":"3-4 sentences about body, mind, energy and nurturing practices","angelMeaning":"what '+angels.health+' means for their wellbeing"},"money":{"message":"3-4 sentences about abundance, finances and receiving","angelMeaning":"what '+angels.money+' means for their abundance"}},"tasks":["a rich specific sensory creative ritual for this present-moment energy, 20-30 words","a self-love practice connected to their moon sign and this card, 20-30 words","a reflective journaling prompt bridging this card with their life right now, 20-30 words"]}';
+  var prompt=chartCtx+transitCtx+emotionCtx+reversedCtx+'\n\nThey drew the "'+card.name+'" card ('+card.suit+')'+(reversed?' — REVERSED':'')+' for a present-moment reading.\n\nAngel numbers assigned for today: life='+angels.life+', relationships='+angels.relationships+', friendships='+angels.friendships+', work='+angels.work+', health='+angels.health+', money='+angels.money+'.\n\nRespond ONLY with valid JSON, no markdown:\n{"interpretation":"4-6 rich poetic sentences interpreting this card. CRITICAL: if there are active transit aspects, reference them specifically by name (e.g. Jupiter transiting natal Moon, Mercury retrograde). Make the transit aspects the living context of the reading for this present-moment reading, weaving in their sun, moon, rising signs specifically. Be evocative and personal. Reference what this card calls them toward creatively and spiritually.","chartNote":"2 sentences: how their specific chart combination amplifies this card today","mantra":"a beautiful Buddhist-inspired mantra, may include Sanskrit, 1-2 lines, deeply resonant with this card energy","loveLetter":{"intro":"2-3 warm sentences addressed to @'+currentUser.nick+' opening the love letter, connecting their whole being to this card","life":{"message":"3-4 sentences about their overall life path and soul journey right now","angelMeaning":"what '+angels.life+' means for them specifically today"},"relationships":{"message":"3-4 sentences about love and romantic connections","angelMeaning":"what '+angels.relationships+' means for their love life"},"friendships":{"message":"3-4 sentences about friendships, community and soul tribe","angelMeaning":"what '+angels.friendships+' means for their friendships"},"work":{"message":"3-4 sentences about creative work, career and artistic calling","angelMeaning":"what '+angels.work+' means for their work and creativity"},"health":{"message":"3-4 sentences about body, mind, energy and nurturing practices","angelMeaning":"what '+angels.health+' means for their wellbeing"},"money":{"message":"3-4 sentences about abundance, finances and receiving","angelMeaning":"what '+angels.money+' means for their abundance"}},"tasks":["a rich specific sensory creative ritual for this present-moment energy, 20-30 words","a self-love practice connected to their moon sign and this card, 20-30 words","a reflective journaling prompt bridging this card with their life right now, 20-30 words"]}';
   try{
     var res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
       model:'claude-sonnet-4-20250514',max_tokens:2400,
@@ -3174,37 +3407,30 @@ function toggleEntryPublic(id){
 function getAllPublicEntries(){
   var all=[];
   var users=getUsers();
-  // Journal entries
   Object.keys(users).forEach(function(key){
     try{
       var ents=JSON.parse(localStorage.getItem('am_entries_'+key)||'[]');
-      ents.filter(function(e){return e.isPublic;}).forEach(function(e){all.push(e);});
+      ents.filter(function(e){return e.isPublic;}).forEach(function(e){
+        e.contentType='journal'; all.push(e);
+      });
     }catch(ex){}
-    // Micro posts
     try{
       var posts=JSON.parse(localStorage.getItem('am_posts_'+key)||'[]');
-      posts.filter(function(p){return p.isPublic!==false;}).forEach(function(p){all.push(p);});
+      posts.filter(function(p){return p.isPublic!==false;}).forEach(function(p){
+        p.contentType='post'; all.push(p);
+      });
     }catch(ex){}
   });
-  // Also from local feed (own posts before others follow)
   try{
     var feed=JSON.parse(localStorage.getItem('am_feed')||'[]');
     feed.forEach(function(p){
-      if(!all.find(function(x){return x.id===p.id;})) all.push(p);
+      if(!all.find(function(x){return String(x.id)===String(p.id);})){
+        p.contentType='post'; all.push(p);
+      }
     });
   }catch(ex){}
   return all.sort(function(a,b){return new Date(b.date)-new Date(a.date);});
 }
-var MONKEYS=[
-  {key:'see',emoji:'🙈',label:'I felt this'},
-  {key:'hear',emoji:'🙉',label:'This silenced me'},
-  {key:'speak',emoji:'🙊',label:'Unspeakable'},
-  {key:'monkey',emoji:'🐒',label:'Just vibing'},
-  {key:'face',emoji:'🐵',label:'Cute & chaotic'},
-  {key:'gorilla',emoji:'🦍',label:'This hit different'},
-  {key:'ape',emoji:'🦧',label:'Deep in my soul'},
-  {key:'banana',emoji:'🍌',label:'Take my banana'}
-];
 function getLikes(id){return[];}
 function getMonkeyReactions(id){try{return JSON.parse(localStorage.getItem('am_monkeys_'+id)||'{}');}catch(e){return{};}}
 function saveMonkeyReactions(id,data){try{localStorage.setItem('am_monkeys_'+id,JSON.stringify(data));}catch(e){}}
@@ -3414,6 +3640,7 @@ function renderCommunityEventsStrip(){
 }
 function renderCommunity(){
   try{renderCommunityEventsStrip();}catch(e){}
+  try{renderDiscoverPeople();}catch(e){}
   var feed=document.getElementById('communityFeed');if(!feed)return;
   // Try Supabase first
   if(supabaseReady){
@@ -3426,6 +3653,147 @@ function renderCommunity(){
     return;
   }
   renderCommunityFeed(getAllPublicEntries());
+}
+
+
+
+function toggleReplies(entryId){
+  var listEl = document.getElementById('reply-list-'+entryId);
+  var inputEl = document.getElementById('reply-input-'+entryId);
+  var btn = listEl ? listEl.parentNode.querySelector('button') : null;
+  if(!listEl) return;
+  var isOpen = listEl.style.display !== 'none';
+  if(isOpen){
+    listEl.style.display='none';
+    if(inputEl) inputEl.style.display='none';
+  } else {
+    listEl.style.display='block';
+    if(inputEl) inputEl.style.display='flex';
+    renderReplies(entryId, listEl);
+  }
+}
+
+function renderReplies(entryId, container){
+  var replies = [];
+  try{ replies = JSON.parse(localStorage.getItem('am_replies_'+entryId)||'[]'); }catch(e){}
+  if(!replies.length){ container.innerHTML='<p style="font-size:.75rem;color:var(--muted);font-style:italic;padding:.3rem 0">No replies yet ✦</p>'; return; }
+  container.innerHTML = replies.map(function(r){
+    var d = new Date(r.date).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    return '<div style="display:flex;gap:.5rem;padding:.4rem 0;border-bottom:1px solid rgba(255,255,255,.04)">'
+      + '<div style="width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#c77dff,#4d96ff);display:flex;align-items:center;justify-content:center;font-size:.55rem;font-weight:700;color:#fff;flex-shrink:0">'+r.nick.slice(0,2).toUpperCase()+'</div>'
+      + '<div style="flex:1;min-width:0"><div style="font-size:.72rem;color:#c77dff">@'+r.nick+' <span style="color:var(--muted)">· '+d+'</span></div>'
+      + '<p style="font-size:.82rem;color:var(--text);margin:.15rem 0 0;line-height:1.5">'+r.text+'</p></div>'
+      + '</div>';
+  }).join('');
+}
+
+function postReply(entryId){
+  var inp = document.getElementById('reply-text-'+entryId);
+  var txt = inp ? inp.value.trim() : '';
+  if(!txt || !currentUser) return;
+  var replies = [];
+  try{ replies = JSON.parse(localStorage.getItem('am_replies_'+entryId)||'[]'); }catch(e){}
+  replies.push({nick:currentUser.nick, text:txt, date:new Date().toISOString()});
+  try{ localStorage.setItem('am_replies_'+entryId, JSON.stringify(replies)); }catch(e){}
+  if(inp) inp.value='';
+  var listEl = document.getElementById('reply-list-'+entryId);
+  if(listEl) renderReplies(entryId, listEl);
+  // Update reply count button
+  var btn = listEl ? listEl.parentNode.querySelector('button') : null;
+  if(btn) btn.textContent = '💬 '+replies.length+' '+(replies.length===1?'reply':'replies');
+  addRitualPoints('post', 'Posted a reply ✦');
+}
+function renderDiscoverPeople(){
+  var wrap = document.getElementById('discoverPeople');
+  if(!wrap) return;
+
+  // Try Supabase for cross-device users
+  if(supabaseReady && window.supa){
+    window.supa.from('users').select('nick,chart').limit(50).then(function(res){
+      var sbUsers = (res.data||[]).map(function(u){ return {nick:u.nick, chart:u.chart||{}}; });
+      _renderDiscoverList(sbUsers);
+    }).catch(function(){
+      _renderDiscoverList(Object.values(getUsers()));
+    });
+  } else {
+    _renderDiscoverList(Object.values(getUsers()));
+  }
+}
+
+function _renderDiscoverList(allUsers){
+  var wrap = document.getElementById('discoverPeople');
+  if(!wrap) return;
+  var me = currentUser ? currentUser.nick.toLowerCase() : '';
+  var followData = getFollowData();
+  var myFollowing = (followData[me]&&followData[me].following)||[];
+  var others = allUsers.filter(function(u){ return u.nick && u.nick.toLowerCase() !== me; });
+
+  if(!others.length){
+    wrap.innerHTML='<p style="font-size:.78rem;color:var(--muted);font-style:italic;text-align:center;padding:.5rem">No other users yet — share the link ✦</p>';
+    return;
+  }
+  others.sort(function(a,b){
+    var aF=myFollowing.indexOf((a.nick||'').toLowerCase())>-1;
+    var bF=myFollowing.indexOf((b.nick||'').toLowerCase())>-1;
+    return aF-bF;
+  });
+
+  wrap.innerHTML='';
+  others.slice(0,20).forEach(function(u){
+    if(!u.nick) return;
+    var isF = myFollowing.indexOf(u.nick.toLowerCase()) > -1;
+    var ch = u.chart||{};
+    var signs = ch.sunSign ? '☀ '+ch.sunSign+(ch.moonSign?' · ☽ '+ch.moonSign:'') : '';
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:.7rem;padding:.55rem 0;border-bottom:1px solid rgba(255,255,255,.05)';
+    var av = document.createElement('div');
+    av.style.cssText = 'width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#c77dff,#4d96ff);display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:#fff;flex-shrink:0';
+    av.textContent = u.nick.slice(0,2).toUpperCase();
+    var info = document.createElement('div'); info.style.cssText = 'flex:1;min-width:0';
+    info.innerHTML = '<div style="font-size:.85rem;color:var(--text)">@'+u.nick+'</div>'+(signs?'<div style="font-size:.68rem;color:var(--muted)">'+signs+'</div>':'');
+    var btn = document.createElement('button');
+    btn.textContent = isF ? 'Following' : 'Follow ✦';
+    btn.dataset.nick = u.nick.toLowerCase();
+    btn.dataset.following = isF ? '1' : '0';
+    btn.style.cssText = 'font-size:.72rem;padding:.3rem .75rem;border-radius:50px;cursor:pointer;font-family:Cormorant Garamond,serif;white-space:nowrap;transition:all .2s;border:1px solid '+(isF?'rgba(255,255,255,.12)':'rgba(199,125,255,.35)')+';background:'+(isF?'transparent':'rgba(199,125,255,.1)')+';color:'+(isF?'var(--muted)':'#c77dff');
+    btn.onclick = function(){
+      var nick=this.dataset.nick; var isNowF=this.dataset.following==='1';
+      if(isNowF){ unfollowUser(nick,this); this.dataset.following='0'; }
+      else { followUser(nick,this); this.dataset.following='1'; }
+    };
+    row.appendChild(av); row.appendChild(info); row.appendChild(btn);
+    wrap.appendChild(row);
+  });
+}
+
+
+function searchPeople(query){
+  if(!query.trim()){ renderDiscoverPeople(); return; }
+  var users=getUsers(); var me=currentUser?currentUser.nick.toLowerCase():'';
+  var followData=getFollowData(); var myFollowing=(followData[me]&&followData[me].following)||[];
+  var results=Object.values(users).filter(function(u){
+    return u.nick.toLowerCase()!==me && (u.nick.toLowerCase().includes(query.toLowerCase())||(u.name||'').toLowerCase().includes(query.toLowerCase()));
+  });
+  var wrap=document.getElementById('discoverPeople');
+  if(!wrap) return;
+  if(!results.length){ wrap.innerHTML='<p style="font-size:.82rem;color:var(--muted);text-align:center;padding:.5rem">No users found</p>'; return; }
+  wrap.innerHTML='';
+  results.slice(0,10).forEach(function(u){
+    var isF=myFollowing.indexOf(u.nick.toLowerCase())>-1;
+    var row=document.createElement('div'); row.style.cssText='display:flex;align-items:center;gap:.7rem;padding:.5rem 0;border-bottom:1px solid rgba(255,255,255,.05)';
+    var av=document.createElement('div'); av.style.cssText='width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#c77dff,#4d96ff);display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;color:#fff;flex-shrink:0';
+    av.textContent=u.nick.slice(0,2).toUpperCase();
+    var nm=document.createElement('span'); nm.style.cssText='flex:1;font-size:.85rem;color:var(--text)'; nm.textContent='@'+u.nick;
+    var btn=document.createElement('button');
+    btn.textContent=isF?'Following':'Follow ✦'; btn.dataset.nick=u.nick.toLowerCase(); btn.dataset.following=isF?'1':'0';
+    btn.style.cssText='font-size:.72rem;padding:.28rem .7rem;border-radius:50px;cursor:pointer;font-family:Cormorant Garamond,serif;border:1px solid '+(isF?'rgba(255,255,255,.12)':'rgba(199,125,255,.35)')+';background:'+(isF?'transparent':'rgba(199,125,255,.1)')+';color:'+(isF?'var(--muted)':'#c77dff');
+    btn.onclick=function(){
+      var nick=this.dataset.nick; var isNowF=this.dataset.following==='1';
+      if(isNowF){ unfollowUser(nick,this); this.dataset.following='0'; }
+      else { followUser(nick,this); this.dataset.following='1'; }
+    };
+    row.appendChild(av); row.appendChild(nm); row.appendChild(btn); wrap.appendChild(row);
+  });
 }
 
 function renderCommunityFeed(all){
@@ -3444,7 +3812,32 @@ function renderCommunityFeed(all){
   feed.innerHTML='';
   if(!all.length){feed.innerHTML='<p class="comm-empty">No public entries yet — be the first to share your work, persona</p>';return;}
   all.forEach(function(e){var div=document.createElement('div');div.className='comm-card';var ds=new Date(e.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});var initials=(e.nick||'?').slice(0,2).toUpperCase();var signs=e.chart?'&#9788; '+e.chart.sunSign+(e.chart.moonSign?' &#183; &#9789; '+e.chart.moonSign:''):'';var typeBadge=e.type==='micro'?'<span style="font-size:.58rem;padding:.1rem .4rem;border-radius:50px;background:rgba(77,150,255,.1);color:#4d96ff;border:1px solid rgba(77,150,255,.2);margin-left:.4rem">✦ post</span>':'<span style="font-size:.58rem;padding:.1rem .4rem;border-radius:50px;background:rgba(199,125,255,.1);color:#c77dff;border:1px solid rgba(199,125,255,.2);margin-left:.4rem">✎ journal</span>';
-  div.innerHTML='<div class="comm-author"><div class="comm-avatar">'+initials+'</div><div><div class="comm-nick">@'+e.nick+'</div><div class="comm-signs">'+signs+'</div></div><div style="display:flex;align-items:center;gap:.5rem;margin-left:auto">'+renderFollowBtn(e.nick)+'<span class="comm-date">'+ds+'</span></div></div>'+(e.text?'<p class="comm-text">'+e.text+'</p>':'')+(e.image?'<img class="comm-img" src="'+e.image+'" alt="artwork">':'')+renderMonkeys(e.id);feed.appendChild(div);});
+  var contentBadge = e.contentType==='post'
+      ? '<span style="font-size:.58rem;padding:.08rem .4rem;border-radius:50px;background:rgba(77,150,255,.1);color:#4d96ff;border:1px solid rgba(77,150,255,.2);margin-left:.35rem">✦ post</span>'
+      : '<span style="font-size:.58rem;padding:.08rem .4rem;border-radius:50px;background:rgba(199,125,255,.1);color:#c77dff;border:1px solid rgba(199,125,255,.2);margin-left:.35rem">✎ journal</span>';
+    var replies=[];try{replies=JSON.parse(localStorage.getItem('am_replies_'+e.id)||'[]');}catch(xr){}
+    div.innerHTML='<div class="comm-author"><div class="comm-avatar">'+initials+'</div>'
+      +'<div><div class="comm-nick">@'+e.nick+contentBadge+'</div><div class="comm-signs">'+signs+'</div></div>'
+      +'<div style="display:flex;align-items:center;gap:.5rem;margin-left:auto">'+renderFollowBtn(e.nick)+'<span class="comm-date">'+ds+'</span></div></div>'
+      +(e.text?'<p class="comm-text">'+e.text+'</p>':'')
+      +(e.image?'<img class="comm-img" src="'+e.image+'" alt="artwork">':'')
+      +renderMonkeys(e.id)
+      +'<div class="reply-section">'
+      +'<button data-eid="'+e.id+'" id="reply-btn-'+e.id+'" style="background:none;border:none;cursor:pointer;font-size:.75rem;color:var(--muted);font-family:Cormorant Garamond,serif;padding:.25rem 0;letter-spacing:.04em">'
+      +'💬 '+(replies.length?replies.length+(replies.length===1?' reply':' replies'):'Reply')+'</button>'
+      +'<div class="reply-list" id="reply-list-'+e.id+'" style="display:none;padding-top:.3rem"></div>'
+      +'<div id="reply-input-'+e.id+'" style="display:none;gap:.4rem;margin-top:.4rem;align-items:center">'
+      +'<input placeholder="Write a reply..." style="flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:.4rem .7rem;color:#fff;font-size:.82rem;outline:none;font-family:Cormorant Garamond,serif" id="reply-text-'+e.id+'">'
+      +'<button data-eid-post="'+e.id+'" id="post-reply-btn-'+e.id+'" style="padding:.38rem .8rem;border-radius:8px;border:none;background:linear-gradient(135deg,var(--accent),#4d96ff);color:#fff;cursor:pointer;font-size:.8rem;font-family:Cormorant Garamond,serif;font-weight:600;flex-shrink:0">↩ Post</button>'
+      +'</div></div>';
+    feed.appendChild(div);
+    // Wire reply buttons
+    (function(eid){
+      var rb = document.getElementById('reply-btn-'+eid);
+      var pb = document.getElementById('post-reply-btn-'+eid);
+      if(rb) rb.onclick = function(){ toggleReplies(eid); };
+      if(pb) pb.onclick = function(){ postReply(eid); };
+    }(String(e.id)));});
 }
 function renderAdmin(){var users=getUsers();var keys=Object.keys(users);var allPub=getAllPublicEntries();var totalAll=0;keys.forEach(function(k){try{totalAll+=JSON.parse(localStorage.getItem('am_entries_'+k)||'[]').length;}catch(ex){}});document.getElementById('adminStats').innerHTML='<div class="stat-card"><div class="stat-num">'+keys.length+'</div><div class="stat-lbl">Members</div></div><div class="stat-card"><div class="stat-num">'+allPub.length+'</div><div class="stat-lbl">Public Posts</div></div><div class="stat-card"><div class="stat-num">'+totalAll+'</div><div class="stat-lbl">Total Entries</div></div>';var tbody=document.getElementById('adminBody');tbody.innerHTML='';keys.forEach(function(k){var u=users[k];var c=u.chart||{};var cnt=0;try{cnt=JSON.parse(localStorage.getItem('am_entries_'+k)||'[]').length;}catch(ex){}var jd=u.joinDate?new Date(u.joinDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';var tr=document.createElement('tr');tr.innerHTML='<td>@'+u.nick+'</td><td style="color:var(--muted);font-size:.82rem">'+(u.name&&u.name!==u.nick?u.name:'—')+'</td><td><span class="c-badge badge-sun" style="font-size:.7rem">'+(c.sunSign||'—')+'</span></td><td><span class="c-badge badge-moon" style="font-size:.7rem">'+(c.moonSign||'—')+'</span></td><td><span class="c-badge badge-rising" style="font-size:.7rem">'+(c.risingSign||'—')+'</span></td><td style="font-size:.8rem;color:var(--muted)">'+jd+'</td><td style="text-align:center">'+cnt+'</td>';tbody.appendChild(tr);});var admFeed=document.getElementById('adminPublicFeed');admFeed.innerHTML='';if(!allPub.length){admFeed.innerHTML='<p class="comm-empty">No public entries yet.</p>';return;}allPub.forEach(function(e){var div=document.createElement('div');div.className='comm-card';var initials=(e.nick||'?').slice(0,2).toUpperCase();var d=new Date(e.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});var likes=getLikes(e.id);div.innerHTML='<div class="comm-author"><div class="comm-avatar">'+initials+'</div><div class="comm-nick">@'+e.nick+'</div><div class="comm-date" style="margin-left:auto">'+d+'</div></div>'+(e.text?'<p class="comm-text" style="font-size:.9rem">'+e.text+'</p>':'')+(e.image?'<img class="comm-img" src="'+e.image+'" alt="">':'')+(function(){var d=getMonkeyReactions(e.id);var total=MONKEYS.reduce(function(s,m){return s+(d[m.key]||[]).length;},0);return '<div style="font-size:.78rem;color:var(--muted);margin-top:.6rem">🙈🙉🙊 '+total+' reactions</div>';}());admFeed.appendChild(div);});}
 
@@ -3980,6 +4373,28 @@ function showCreatePersonaModal(){
   ov.appendChild(box); document.body.appendChild(ov);
   ov.onclick=function(e){if(e.target===ov)ov.remove();};
   setTimeout(function(){nameInput.focus();},100);
+}
+
+function triggerAvatarUpload(){
+  var inp = document.createElement('input'); inp.type='file'; inp.accept='image/*';
+  inp.onchange = function(){
+    if(!this.files[0]) return;
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      var dataUrl = ev.target.result;
+      currentUser.avatar = dataUrl;
+      saveCurrentUser();
+      // Update top bar avatar
+      var av = document.getElementById('uAvatar');
+      if(av){ av.style.backgroundImage='url('+dataUrl+')'; av.style.backgroundSize='cover'; av.style.backgroundPosition='center'; av.textContent=''; }
+      // Refresh profile modal
+      var ov = document.getElementById('profileOverlay'); if(ov) ov.remove();
+      showProfileModal();
+      showFollowNotif('','Profile photo updated ✦');
+    };
+    reader.readAsDataURL(this.files[0]);
+  };
+  inp.click();
 }
 function getPersonas(){
   if(!currentUser.personas||currentUser.personas.length===0){
@@ -4880,7 +5295,7 @@ function createCircle(){
   var name=document.getElementById('cName').value.trim();
   var manifesto=document.getElementById('cManifesto').value.trim();
   var ritual=document.getElementById('cRitual').value.trim();
-  if(!name||!manifesto||!ritual){document.getElementById('cErr').style.display='block';return;}
+  if(!name||!manifesto||!ritual){document.getElementById('cErr').classList.add('show');return;}
   var circles=getAllCircles();
   var circle={
     id:'c'+Date.now(),name:name,manifesto:manifesto,ritual:ritual,
@@ -4889,9 +5304,10 @@ function createCircle(){
     members:[currentUser.nick.toLowerCase()],
     created:new Date().toISOString()
   };
-  circles.push(circle);saveAllCircles(circles);
-  document.getElementById('createCircleOverlay').remove();
+  circles.push(circle); saveAllCircles(circles);
+  try{ document.getElementById('createCircleOverlay').remove(); }catch(x){}
   renderCirclesPage();
+  showFollowNotif('','Spiral created ✦ Welcome to '+name);
 }
 
 
