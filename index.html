@@ -978,7 +978,7 @@ console.log('Supabase connected ✦');
       <div class="u-avatar" id="uAvatar" onclick="showProfileModal()" style="cursor:pointer;position:relative" title="View profile"></div>
       <div>
         
-      <div id="uNick" style="font-size:.84rem;line-height:1.2;color:var(--text)"></div>
+      <div id="uNick" onclick="showProfileModal()" style="font-size:.84rem;line-height:1.2;color:var(--text);cursor:pointer" title="View profile"></div>
         <div id="activePersonaTag" style="font-size:.72rem;color:var(--accent);cursor:pointer;letter-spacing:.04em" onclick="showPersonaSwitcher()"></div>
       </div>
     </div>
@@ -1890,7 +1890,8 @@ function showProfileModal(){
   }())
     +'<div class="profile-nick">@'+currentUser.nick+'</div>'
     +(currentUser.name&&currentUser.name!==currentUser.nick?'<p style="text-align:center;font-size:.82rem;color:var(--muted);margin-bottom:.3rem">'+currentUser.name+'</p>':'')
-    +(joined?'<p style="text-align:center;font-size:.7rem;color:var(--muted);letter-spacing:.1em;margin-bottom:.9rem">Member since '+joined+'</p>':'')
+    +(joined?'<p style="text-align:center;font-size:.7rem;color:var(--muted);letter-spacing:.1em;margin-bottom:.5rem">Member since '+joined+'</p>':'')
+    +(planetsHtml?'<div style="display:flex;flex-wrap:wrap;gap:.3rem;justify-content:center;margin-bottom:.8rem">'+planetsHtml+'</div>':'')
     +'<div class="profile-stat-row" style="display:flex;flex-wrap:wrap;gap:.5rem">'
     +'<div class="profile-stat"><div class="profile-stat-num">'+myEntries.length+'</div><div class="profile-stat-lbl">Entries</div></div>'
     +'<div class="profile-stat"><div class="profile-stat-num">'+cardHistory.length+'</div><div class="profile-stat-lbl">Cards Drawn</div></div>'
@@ -4899,7 +4900,7 @@ function showPersonaSwitcher(){
     {label:'✦ My Custom Personas',  ids:personas.filter(function(p){return p.custom;}).map(function(p){return p.id;})},
   ];
 
-  var html='<div class="modal-box" style="max-width:520px;max-height:85vh;overflow-y:auto">'
+  var html='<div class="modal-box" style="max-width:520px;max-height:85vh;overflow-y:auto"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.8rem"><p style="font-family:Cinzel Decorative,serif;font-size:.85rem;color:var(--accent)">Who are you right now?</p><button onclick="document.getElementById(\'personaSwitcherOv\').remove();showProfileModal()" style="font-size:.75rem;padding:.3rem .75rem;border-radius:50px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--muted);cursor:pointer;font-family:Cormorant Garamond,serif">View Profile →</button></div>'
     +'<button onclick="document.getElementById(\'personaSwitcherOv\').remove()" style="position:absolute;top:1rem;right:1.2rem;background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.3rem">×</button>'
     +'<div style="text-align:center;margin-bottom:1.2rem">'
     +'<p style="font-family:Cinzel Decorative,serif;font-size:.9rem;letter-spacing:.1em;color:var(--accent)">Who are you right now?</p>'
