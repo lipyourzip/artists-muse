@@ -506,7 +506,7 @@ body{background-image:radial-gradient(ellipse at 15% 20%,rgba(130,60,255,.07) 0%
 .portfolio-item:hover .portfolio-item-del{opacity:1}
 .pl-empty{color:var(--muted);font-style:italic;font-size:.85rem;padding:.3rem 0}
 .top-bar{display:flex;align-items:center;justify-content:space-between;padding:.7rem 0 1rem;gap:.5rem}
-.top-bar-left{display:flex;align-items:center;gap:.55rem}
+.top-bar-left{display:flex;align-items:center;gap:.55rem;padding:.3rem .4rem;border-radius:10px;min-height:44px;transition:background .15s}.top-bar-left:active{background:rgba(199,125,255,.1)}
 .top-bar-right{display:flex;align-items:center;gap:.4rem}
 .top-btn{font-family:'Cormorant Garamond',serif;font-size:.82rem;letter-spacing:.07em;padding:.38rem .9rem;border-radius:50px;cursor:pointer;transition:all .22s;white-space:nowrap;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--muted)}
 .top-btn:hover{color:var(--text);background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.18)}
@@ -974,12 +974,12 @@ console.log('Supabase connected ✦');
 
   <!-- Top bar -->
   <div class="top-bar">
-    <div class="top-bar-left">
-      <div class="u-avatar" id="uAvatar" onclick="showProfileModal()" style="cursor:pointer;position:relative" title="View profile"></div>
+    <div class="top-bar-left" onclick="showProfileModal()" style="cursor:pointer;-webkit-tap-highlight-color:rgba(199,125,255,.15)" title="View profile">
+      <div class="u-avatar" id="uAvatar" style="pointer-events:none;position:relative"></div>
       <div>
         
-      <div id="uNick" onclick="showProfileModal()" style="font-size:.84rem;line-height:1.2;color:var(--text);cursor:pointer" title="View profile"></div>
-        <div id="activePersonaTag" style="font-size:.72rem;color:var(--accent);cursor:pointer;letter-spacing:.04em" onclick="showPersonaSwitcher()"></div>
+      <div id="uNick" style="font-size:.84rem;line-height:1.2;color:var(--text)"></div>
+        <div id="activePersonaTag" style="font-size:.72rem;color:var(--accent);letter-spacing:.04em" onclick="event.stopPropagation();showPersonaSwitcher()"></div>
       </div>
     </div>
     <div class="top-bar-right">
@@ -1842,6 +1842,7 @@ async function buildChart(dateStr,timeStr,cityStr,utcOffset){
 }
 
 function showProfileModal(){
+  if(!currentUser){ showFollowNotif('','Please sign in first'); return; }
   var ov=document.createElement('div');ov.className='modal-overlay';ov.id='profileOverlay';
   var c=currentUser.chart||{};
   var initials=currentUser.nick.slice(0,2).toUpperCase();
@@ -2706,6 +2707,19 @@ function renderOracleProgress(){
 }
 
 // getRitualLevel defined in motivation block above
+function getRitualLevel(total){
+  var level = typeof LEVELS!=='undefined' ? LEVELS[0] : {name:'Wanderer',emoji:'✦',color:'#aaa',min:0};
+  if(typeof LEVELS!=='undefined'){
+    for(var i=LEVELS.length-1;i>=0;i--){
+      if(total >= LEVELS[i].min){ level = LEVELS[i]; break; }
+    }
+  }
+  var next = null;
+  if(typeof LEVELS!=='undefined'){
+    for(var j=0;j<LEVELS.length;j++){ if(LEVELS[j].min > total){ next = LEVELS[j].min; break; } }
+  }
+  return {name:level.name, emoji:level.emoji, color:level.color||'#c77dff', next:next};
+}
 
 
 
@@ -2780,6 +2794,30 @@ document.addEventListener('DOMContentLoaded',function(){
       if(user){
         currentUser=user;
         enterApp();
+        return;
+      }
+      // User not in localStorage — try Supabase (new device)
+      if(typeof supa!=='undefined' && supa){
+        supa.from('users').select('*').eq('nick',remembered.toLowerCase()).single().then(function(res){
+          if(res.data){
+            var u=res.data;
+            currentUser={
+              nick:u.nick, name:u.name||u.nick, avatar:u.avatar||null,
+              chart:u.chart||{}, personas:u.personas||[], activePersonaId:u.active_persona_id||null,
+              isPrivate:u.is_private||false, joinDate:u.join_date||new Date().toISOString(),
+              lastLogin:new Date().toISOString(), elements:[], badges:[]
+            };
+            // Save to localStorage
+            var lu=getUsers(); lu[u.nick.toLowerCase()]=currentUser; saveUsers(lu);
+            enterApp();
+          } else {
+            document.getElementById('authScreen').style.display='flex';
+            document.getElementById('appScreen').style.display='none';
+          }
+        }).catch(function(){
+          document.getElementById('authScreen').style.display='flex';
+          document.getElementById('appScreen').style.display='none';
+        });
         return;
       }
     }
