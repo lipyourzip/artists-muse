@@ -8033,6 +8033,7 @@ document.addEventListener('mouseup', function(){
 // ── ADD ELEMENT ───────────────────────────────
 function _add(el, x, y){
   var board = _board(); if(!board) return;
+  _saveUndo(); // save state before adding
 
   el.style.position = 'absolute';
   el.style.left = (x||40)+'px';
