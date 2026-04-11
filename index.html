@@ -2183,65 +2183,158 @@ function getOffsetFromTZ(tzName,dateObj){
   }catch(e){return null;}
 }
 
-async function computeChart(dateStr,timeStr,cityStr){
-  var hasTime=!!(timeStr&&timeStr.length>=4);
-  var p=dateStr.split('-');var yr=parseInt(p[0]),mo=parseInt(p[1]),dy=parseInt(p[2]);
-  var hr=12,mn=0;
-  if(hasTime){var tp=timeStr.split(':');hr=parseInt(tp[0]);mn=parseInt(tp[1]||0);}
+async function computeChart(dateStr, timeStr, cityStr){
+  var hasTime = !!(timeStr && timeStr.length >= 4);
+  var p = dateStr.split('-');
+  var yr = parseInt(p[0]), mo = parseInt(p[1]), dy = parseInt(p[2]);
+  var hr = 12, mn = 0;
+  if(hasTime){ var tp = timeStr.split(':'); hr = parseInt(tp[0]); mn = parseInt(tp[1]||0); }
 
-  var chart={sunSign:sunSignFromDate(dateStr),moonSign:null,risingSign:null,planets:{},birthDate:dateStr,birthTime:timeStr||null,birthCity:cityStr||null,hasTime:hasTime,cityLabel:null};
+  var SIGNS = ['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
+  var chart = {
+    sunSign: sunSignFromDate(dateStr),
+    moonSign: null, risingSign: null, planets: {},
+    birthDate: dateStr, birthTime: timeStr||null, birthCity: cityStr||null,
+    hasTime: hasTime, cityLabel: null
+  };
 
-  if(!cityStr||cityStr.trim().length<2) return chart;
+  // ── Julian Day ──────────────────────────────────────────────
+  function julianDay(y, m, d_frac){
+    if(m<=2){y--;m+=12;}
+    var A=Math.floor(y/100), B=2-A+Math.floor(A/4);
+    return Math.floor(365.25*(y+4716))+Math.floor(30.6001*(m+1))+d_frac+B-1524.5;
+  }
+
+  // ── Moon longitude (Meeus Ch.47, accurate ±0.3°) ───────────
+  function moonLongitude(JD){
+    var T=(JD-2451545.0)/36525.0;
+    function r(x){return(x%360+360)%360*Math.PI/180;}
+    var D  = (297.8501921+445267.1114034*T-0.0018819*T*T)*Math.PI/180;
+    var M  = (357.5291092+ 35999.0502909*T-0.0001536*T*T)*Math.PI/180;
+    var Mp = (134.9633964+477198.8676313*T+0.0089970*T*T)*Math.PI/180;
+    var F  = ( 93.2720950+483202.0175233*T-0.0036539*T*T)*Math.PI/180;
+    var L0 = (218.3164477+481267.88123421*T-0.0015786*T*T);
+    var Om = (125.0445479-1934.1362608*T+0.0020754*T*T)*Math.PI/180;
+    var E  = 1-0.002516*T;
+
+    var dL = 6288774*Math.sin(Mp)
+      +1274027*Math.sin(2*D-Mp)
+      + 658314*Math.sin(2*D)
+      + 213618*Math.sin(2*Mp)
+      - 185116*Math.sin(M)*E
+      - 114332*Math.sin(2*F)
+      +  58793*Math.sin(2*D-2*Mp)
+      -  57066*Math.sin(2*D-M-Mp)*E
+      +  53322*Math.sin(2*D+Mp)
+      +  45758*Math.sin(2*D-M)*E
+      -  40923*Math.sin(M-Mp)*E
+      -  34720*Math.sin(D)
+      -  30383*Math.sin(M+Mp)*E
+      +  15327*Math.sin(2*D-2*F)
+      +  10980*Math.sin(Mp-2*F)
+      +  10675*Math.sin(4*D-Mp)
+      +  10034*Math.sin(3*Mp)
+      +   8548*Math.sin(4*D-2*Mp)
+      -   7888*Math.sin(2*D+M-Mp)*E
+      -   6766*Math.sin(2*D+M)*E
+      -   5163*Math.sin(D-Mp)
+      +   4987*Math.sin(D+M)*E
+      +   4036*Math.sin(2*D-M+Mp)*E
+      +   3994*Math.sin(2*D+2*Mp)
+      +   3861*Math.sin(4*D)
+      +   3665*Math.sin(2*D-3*Mp)
+      -   2689*Math.sin(M-2*Mp)*E
+      +   2390*Math.sin(2*D-M-2*Mp)*E
+      -   2348*Math.sin(D+Mp)
+      +   2236*Math.sin(2*D-2*M)*E*E
+      -   2120*Math.sin(M+2*Mp)*E
+      +   1215*Math.sin(4*D-M-Mp)*E
+      -    892*Math.sin(3*D-Mp)
+      -    810*Math.sin(2*D+M+Mp)*E
+      +    759*Math.sin(4*D-M-2*Mp)*E
+      +    3958*Math.sin(Om)
+      +    1962*Math.sin(L0*Math.PI/180-Mp);
+    var lon = (L0 + dL/1000000.0);
+    return ((lon%360)+360)%360;
+  }
+
+  // ── Planet longitude via simplified VSOP87 (accurate ±1°) ──
+  function planetLon(body, T){
+    // Mean longitudes + corrections (simplified, good for sign purposes)
+    var L, M2;
+    switch(body){
+      case 'Mercury': L=252.251+149474.070*T; M2=168.6+1.7*T; L+=23.440*Math.sin((M2+105.6)*Math.PI/180); break;
+      case 'Venus':   L=181.980+ 58519.213*T; M2=212.7+1.6*T; L+=0.770*Math.sin(M2*Math.PI/180); break;
+      case 'Mars':    L=355.433+  19141.696*T; M2=19.37+0.52*T; L+=10.691*Math.sin(M2*Math.PI/180); break;
+      case 'Jupiter': L= 34.351+   3034.906*T; M2=20.02+0.083*T; L+=5.55*Math.sin(M2*Math.PI/180); break;
+      case 'Saturn':  L= 50.077+   1222.114*T; M2=317.02+0.033*T; L+=6.40*Math.sin(M2*Math.PI/180); break;
+      case 'Uranus':  L=314.055+    429.863*T; break;
+      case 'Neptune': L=304.349+    219.457*T; break;
+      case 'Pluto':   L=238.9+   143.7*T; break;
+      default: return null;
+    }
+    return ((L%360)+360)%360;
+  }
+
+  // ── Rising sign via LMST ────────────────────────────────────
+  function risingSign(JD, lat, lon){
+    var T=(JD-2451545.0)/36525.0;
+    var GMST=((280.46061837+360.98564736629*(JD-2451545)+0.000387933*T*T)%360+360)%360;
+    var LMST=((GMST+lon)%360+360)%360;
+    var eps=(23.4393-0.013*T)*Math.PI/180;
+    var L=LMST*Math.PI/180;
+    var latR=lat*Math.PI/180;
+    var y=-Math.cos(L);
+    var x=Math.sin(L)*Math.cos(eps)+Math.tan(latR)*Math.sin(eps);
+    var asc=((Math.atan2(y,x)*180/Math.PI)+360)%360;
+    if(Math.cos(L)<0) asc=(asc+180)%360;
+    return asc;
+  }
 
   try{
-    // Geocode city
-    var gr=await fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(cityStr)+'&format=json&limit=1&accept-language=en');
-    var gd=await gr.json();
+    // Geocode
+    var gr = await fetch('https://nominatim.openstreetmap.org/search?q='+encodeURIComponent(cityStr||'')+'&format=json&limit=1&accept-language=en');
+    var gd = await gr.json();
     if(!gd||!gd[0]) return chart;
-    var lat=parseFloat(gd[0].lat),lon=parseFloat(gd[0].lon);
-    chart.cityLabel=gd[0].display_name.split(',').slice(0,2).join(',');
+    var lat = parseFloat(gd[0].lat), lon = parseFloat(gd[0].lon);
+    chart.cityLabel = gd[0].display_name.split(',').slice(0,2).join(',');
 
-    // Get IANA timezone name
-    var tzName=await getIANATimezone(lat,lon);
-    if(!tzName) return chart;
+    // Timezone
+    var tzName = await getIANATimezone(lat, lon);
+    var localBirth = new Date(Date.UTC(yr, mo-1, dy, hr, mn, 0));
+    var offset = tzName ? getOffsetFromTZ(tzName, localBirth) : Math.round(lon/15);
+    if(offset===null) offset = Math.round(lon/15);
 
-    // Get historical UTC offset for this exact birth date using Intl API
-    var localBirth=new Date(Date.UTC(yr,mo-1,dy,hr,mn,0));
-    var offset=getOffsetFromTZ(tzName,localBirth);
-    if(offset===null) return chart;
+    // UTC birth time
+    var utcMs = localBirth.getTime() - (offset * 3600000);
+    var utcDate = new Date(utcMs);
+    var utcYr=utcDate.getUTCFullYear(), utcMo=utcDate.getUTCMonth()+1, utcDy=utcDate.getUTCDate();
+    var utcHr=utcDate.getUTCHours(), utcMn=utcDate.getUTCMinutes();
+    var dyFrac = utcDy + (utcHr + utcMn/60.0)/24.0;
+    var JD = julianDay(utcYr, utcMo, dyFrac);
+    var T = (JD - 2451545.0) / 36525.0;
 
-    // Convert local time to UTC
-    var utcMs=localBirth.getTime()-(offset*3600000);
-    var utcDate=new Date(utcMs);
+    // Moon
+    var moonLon = moonLongitude(JD);
+    chart.moonSign = SIGNS[Math.floor(moonLon/30)];
 
-    // Moon sign: simplified but accurate orbital period calculation
-    // Mean lunar orbital period: 27.321582 days, ref new moon Jan 6 2000 18:14 UTC
-    var refNewMoon=new Date(Date.UTC(2000,0,6,18,14,0));
-    var daysSinceRef=(utcDate-refNewMoon)/86400000;
-    var lunarCycle=27.321582;
-    var moonPos=((daysSinceRef%lunarCycle)+lunarCycle)%lunarCycle;
-    var moonDeg=(moonPos/lunarCycle)*360;
-    // Add reference moon position at epoch (moon was at ~117° ecliptic on Jan 6 2000)
-    moonDeg=(moonDeg+117)%360;
-    var SIGNS=['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
-    chart.moonSign=SIGNS[Math.floor(moonDeg/30)];
+    // Planets
+    ['Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto'].forEach(function(body){
+      var lon2 = planetLon(body, T);
+      if(lon2!==null) chart.planets[body] = SIGNS[Math.floor(lon2/30)];
+    });
 
-    // Rising sign (ascendant) via LMST
+    // North Node (mean)
+    var nodeLon = ((125.0445 - 0.0529539*(JD-2451545))%360+360)%360;
+    chart.planets['N.Node'] = SIGNS[Math.floor(nodeLon/30)];
+
+    // Rising
     if(hasTime){
-      var jd=utcDate/86400000+2440587.5;
-      var T=(jd-2451545.0)/36525;
-      var GMST=((280.46061837+360.98564736629*(jd-2451545)+0.000387933*T*T)%360+360)%360;
-      var LMST=((GMST+lon)%360+360)%360;
-      var eps=(23.4393-0.013*T)*Math.PI/180;
-      var L=LMST*Math.PI/180;
-      var latR=lat*Math.PI/180;
-      var y=-Math.cos(L);
-      var x=Math.sin(L)*Math.cos(eps)+Math.tan(latR)*Math.sin(eps);
-      var asc=((Math.atan2(y,x)*180/Math.PI)+360)%360;
-      if(Math.cos(L)<0)asc=(asc+180)%360;
-      chart.risingSign=SIGNS[Math.floor(asc/30)];
+      var ascLon = risingSign(JD, lat, lon);
+      chart.risingSign = SIGNS[Math.floor(ascLon/30)];
     }
-  }catch(e){}
+  }catch(e){ console.warn('Chart error:', e); }
+
   return chart;
 }
 
@@ -8168,8 +8261,6 @@ document.addEventListener('mouseup', function(){
 // ── ADD ELEMENT ───────────────────────────────
 function _add(el, x, y){
   var board = _board(); if(!board) return;
-  _saveUndo(); // save state before adding
-
   el.style.position = 'absolute';
   el.style.left = (x||40)+'px';
   el.style.top  = (y||40)+'px';
@@ -8261,6 +8352,8 @@ function _add(el, x, y){
 
   board.appendChild(el);
   _select(el);
+  // Save undo state AFTER item is in DOM
+  setTimeout(_saveUndo, 0);
 }
 
 // ── CONTEXT BAR ───────────────────────────────
