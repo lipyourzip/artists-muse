@@ -2171,7 +2171,49 @@ function sunSignFromDate(dateStr){
 }
 
 async function getIANATimezone(lat,lon){
-  try{var r=await fetch('https://timeapi.io/api/timezone/coordinate?latitude='+lat+'&longitude='+lon);var d=await r.json();return d&&d.timeZone?d.timeZone:null;}catch(e){return null;}
+  // Try timeapi.io first
+  try{
+    var r=await fetch('https://timeapi.io/api/timezone/coordinate?latitude='+lat+'&longitude='+lon);
+    var d=await r.json();
+    if(d&&d.timeZone) return d.timeZone;
+  }catch(e){}
+  // Fallback: geonames (no auth needed for basic)
+  try{
+    var r2=await fetch('http://api.geonames.org/timezoneJSON?lat='+lat+'&lng='+lon+'&username=demo');
+    var d2=await r2.json();
+    if(d2&&d2.timezoneId) return d2.timezoneId;
+  }catch(e2){}
+  // Fallback 2: use Intl to guess from coordinates (embedded lookup)
+  return guessTimezone(lat, lon);
+}
+
+function guessTimezone(lat, lon){
+  // Simplified coordinate-based timezone lookup for common regions
+  // Covers major populated areas accurately enough for offset calculation
+  if(lon>=25 && lon<=45 && lat>=35 && lat<=43) return 'Europe/Istanbul';   // Turkey
+  if(lon>=26 && lon<=45 && lat>=43 && lat<=48) return 'Europe/Bucharest';  // Romania/Bulgaria
+  if(lon>=14 && lon<=25 && lat>=46 && lat<=55) return 'Europe/Warsaw';     // Poland/Czech
+  if(lon>=-10 && lon<=2  && lat>=36 && lat<=60) return 'Europe/London';    // UK/Portugal
+  if(lon>=2  && lon<=15  && lat>=43 && lat<=55) return 'Europe/Paris';     // France/Germany
+  if(lon>=12 && lon<=20  && lat>=40 && lat<=46) return 'Europe/Rome';      // Italy
+  if(lon>=14 && lon<=24  && lat>=44 && lat<=50) return 'Europe/Vienna';    // Austria/Hungary
+  if(lon>=22 && lon<=32  && lat>=37 && lat<=42) return 'Europe/Athens';    // Greece
+  if(lon>=30 && lon<=60  && lat>=55 && lat<=70) return 'Europe/Moscow';    // Russia West
+  if(lon>=44 && lon<=60  && lat>=35 && lat<=43) return 'Asia/Tehran';      // Iran (+offset nearby)
+  if(lon>=35 && lon<=45  && lat>=29 && lat<=37) return 'Asia/Jerusalem';   // Israel
+  if(lon>=35 && lon<=45  && lat>=29 && lat<=38) return 'Asia/Beirut';      // Lebanon/Syria
+  if(lon>=45 && lon<=60  && lat>=21 && lat<=30) return 'Asia/Riyadh';      // Saudi Arabia
+  if(lon>=68 && lon<=77  && lat>=23 && lat<=32) return 'Asia/Karachi';     // Pakistan
+  if(lon>=77 && lon<=85  && lat>=20 && lat<=35) return 'Asia/Kolkata';     // India
+  if(lon>=100 && lon<=120 && lat>=20 && lat<=42) return 'Asia/Shanghai';   // China
+  if(lon>=129 && lon<=145 && lat>=31 && lat<=45) return 'Asia/Tokyo';      // Japan
+  if(lon>=-80 && lon<=-60 && lat>=25 && lat<=50) return 'America/New_York'; // US East
+  if(lon>=-105 && lon<=-80 && lat>=25 && lat<=50) return 'America/Chicago'; // US Central
+  if(lon>=-125 && lon<=-105 && lat>=30 && lat<=50) return 'America/Los_Angeles'; // US West
+  if(lon>=-80 && lon<=-35 && lat>=-35 && lat<=10) return 'America/Sao_Paulo'; // Brazil
+  if(lon>=-75 && lon<=-65 && lat>=-55 && lat<=-20) return 'America/Santiago'; // Chile
+  // Rough UTC offset from longitude as last resort
+  return null;
 }
 
 function getOffsetFromTZ(tzName,dateObj){
@@ -2302,8 +2344,14 @@ async function computeChart(dateStr, timeStr, cityStr){
     // Timezone
     var tzName = await getIANATimezone(lat, lon);
     var localBirth = new Date(Date.UTC(yr, mo-1, dy, hr, mn, 0));
-    var offset = tzName ? getOffsetFromTZ(tzName, localBirth) : Math.round(lon/15);
-    if(offset===null) offset = Math.round(lon/15);
+    var offset = null;
+    if(tzName){
+      offset = getOffsetFromTZ(tzName, localBirth);
+    }
+    // Better fallback: round to nearest 0.5h instead of 1h
+    if(offset===null || isNaN(offset)){
+      offset = Math.round(lon/15*2)/2; // nearest 30min
+    }
 
     // UTC birth time
     var utcMs = localBirth.getTime() - (offset * 3600000);
